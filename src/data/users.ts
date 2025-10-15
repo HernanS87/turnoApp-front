@@ -29,5 +29,12 @@ export const USERS: User[] = [
     password: "123456",
     role: "client",
     clientId: 3
+  },
+  {
+    id: 5,
+    email: "juan@dentista.com",
+    password: "123456",
+    role: "professional",
+    professionalId: 2
   }
 ];

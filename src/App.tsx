@@ -8,8 +8,12 @@ import { ClientDashboardPage } from './pages/client/ClientDashboardPage';
 import { BookAppointmentPage } from './pages/client/BookAppointmentPage';
 import { PayDepositPage } from './pages/client/PayDepositPage';
 import { DashboardPage } from './pages/professional/DashboardPage';
+import { ManageAppointmentsPage } from './pages/professional/ManageAppointmentsPage';
+import { ScheduleConfigPage } from './pages/professional/ScheduleConfigPage';
+import { ManageServicesPage } from './pages/professional/ManageServicesPage';
+import { CustomizationPage } from './pages/professional/CustomizationPage';
 import { ReactNode } from 'react';
-import { PROFESSIONAL } from './data/professional';
+import { getProfessionalByUrl } from './data/professional';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -49,8 +53,20 @@ const ProfessionalLandingWrapper = () => {
   const { professionalUrl } = useParams<{ professionalUrl: string }>();
 
   // Validate professional exists
-  if (professionalUrl !== PROFESSIONAL.customUrl) {
-    return <Navigate to="/" replace />;
+  const professional = getProfessionalByUrl(professionalUrl || '');
+
+  if (!professional) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">404</h1>
+          <p className="text-gray-600 mb-6">Profesional no encontrado</p>
+          <a href="/login" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:opacity-90">
+            Ir al inicio
+          </a>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -58,13 +74,13 @@ const ProfessionalLandingWrapper = () => {
       {/* Public navbar - no auth required */}
       <nav className="bg-white shadow-md">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="text-2xl font-bold text-primary">TurnoApp</div>
-          <a href="/login" className="px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90">
+          <div className="text-2xl font-bold text-indigo-600">TurnoApp</div>
+          <a href="/login" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:opacity-90">
             Iniciar Sesión
           </a>
         </div>
       </nav>
-      <LandingPage />
+      <LandingPage professional={professional} />
     </div>
   );
 };
@@ -114,6 +130,42 @@ const AppRoutes = () => {
           <>
             <Navbar />
             <DashboardPage />
+          </>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/professional/appointments" element={
+        <ProtectedRoute requiredRole="professional">
+          <>
+            <Navbar />
+            <ManageAppointmentsPage />
+          </>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/professional/schedule" element={
+        <ProtectedRoute requiredRole="professional">
+          <>
+            <Navbar />
+            <ScheduleConfigPage />
+          </>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/professional/services" element={
+        <ProtectedRoute requiredRole="professional">
+          <>
+            <Navbar />
+            <ManageServicesPage />
+          </>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/professional/customization" element={
+        <ProtectedRoute requiredRole="professional">
+          <>
+            <Navbar />
+            <CustomizationPage />
           </>
         </ProtectedRoute>
       } />

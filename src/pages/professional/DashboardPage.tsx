@@ -1,22 +1,31 @@
 import { Card } from '../../components/common/Card';
-import { APPOINTMENTS } from '../../data/appointments';
+import { getAllAppointments } from '../../utils/appointmentStorage';
 import { CLIENTS } from '../../data/clients';
-import { SERVICES } from '../../data/services';
+import { getAllServices } from '../../utils/serviceStorage';
+import { useAuth } from '../../hooks/useAuth';
 import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp } from 'lucide-react';
 import { format, isToday, parseISO, isThisWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export const DashboardPage = () => {
+  const { user } = useAuth();
+  const professionalId = user?.professionalId || 1;
+
+  // Get appointments and services for this professional
+  const allAppointments = getAllAppointments();
+  const professionalAppointments = allAppointments.filter(apt => apt.professionalId === professionalId);
+  const services = getAllServices(professionalId);
+
   // Statistics
-  const todayAppointments = APPOINTMENTS.filter(apt => isToday(parseISO(apt.date)));
-  const weekAppointments = APPOINTMENTS.filter(apt => isThisWeek(parseISO(apt.date), { weekStartsOn: 1 }));
-  const pendingAppointments = APPOINTMENTS.filter(apt => apt.status === 'PENDING');
-  const confirmedAppointments = APPOINTMENTS.filter(apt => apt.status === 'CONFIRMED');
+  const todayAppointments = professionalAppointments.filter(apt => isToday(parseISO(apt.date)));
+  const weekAppointments = professionalAppointments.filter(apt => isThisWeek(parseISO(apt.date), { weekStartsOn: 1 }));
+  const pendingAppointments = professionalAppointments.filter(apt => apt.status === 'PENDING');
+  const confirmedAppointments = professionalAppointments.filter(apt => apt.status === 'CONFIRMED');
 
   // Today's appointments with details
   const todayAppointmentsWithDetails = todayAppointments.map(apt => {
     const client = CLIENTS.find(c => c.id === apt.clientId);
-    const service = SERVICES.find(s => s.id === apt.serviceId);
+    const service = services.find(s => s.id === apt.serviceId);
     return { ...apt, client, service };
   }).sort((a, b) => a.startTime.localeCompare(b.startTime));
 

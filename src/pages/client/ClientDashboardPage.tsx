@@ -1,20 +1,56 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { APPOINTMENTS } from '../../data/appointments';
 import { PROFESSIONAL } from '../../data/professional';
 import { SERVICES } from '../../data/services';
+import { getAllAppointments, createAppointment } from '../../utils/appointmentStorage';
+import { calculateEndTime } from '../../utils/availabilityUtils';
 import { Calendar, Clock, User, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import { format, parseISO, isFuture, isPast } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useEffect } from 'react';
+import { toast } from 'react-toastify';
 
 export const ClientDashboardPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Get client appointments
-  const clientAppointments = APPOINTMENTS.filter(
+  // Handle appointment creation from booking flow (no deposit)
+  useEffect(() => {
+    const state = location.state;
+    if (state && 'createAppointment' in state && state.createAppointment && 'pendingAppointment' in state && state.pendingAppointment) {
+      try {
+        const pending = JSON.parse(state.pendingAppointment as string);
+        const service = SERVICES.find(s => s.id === pending.serviceId);
+
+        if (service && user) {
+          createAppointment({
+            professionalId: PROFESSIONAL.id,
+            clientId: user.clientId!,
+            serviceId: service.id,
+            date: pending.date,
+            startTime: pending.time,
+            endTime: calculateEndTime(pending.time, service.durationMinutes),
+            status: 'CONFIRMED',
+            notes: ''
+          });
+
+          sessionStorage.removeItem('pendingAppointment');
+          toast.success('¡Turno confirmado exitosamente!');
+
+          // Clear state
+          navigate(location.pathname, { replace: true, state: {} });
+        }
+      } catch (error) {
+        console.error('Error creating appointment:', error);
+      }
+    }
+  }, [location, user, navigate]);
+
+  // Get client appointments (from hardcoded + localStorage)
+  const clientAppointments = getAllAppointments().filter(
     apt => apt.clientId === user?.clientId
   );
 

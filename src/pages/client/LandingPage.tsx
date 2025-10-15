@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { PROFESSIONAL } from '../../data/professional';
@@ -5,6 +6,7 @@ import { SERVICES } from '../../data/services';
 import { Calendar, Clock, MapPin, Phone, Mail, Instagram, Facebook, Linkedin } from 'lucide-react';
 
 export const LandingPage = () => {
+  const navigate = useNavigate();
   const { siteConfig } = PROFESSIONAL;
 
   return (
@@ -117,7 +119,7 @@ export const LandingPage = () => {
                     </div>
                   </div>
 
-                  <Button fullWidth>
+                  <Button fullWidth onClick={() => navigate(`/book-appointment/${service.id}`)}>
                     Agendar turno
                   </Button>
                 </div>
@@ -130,7 +132,11 @@ export const LandingPage = () => {
             <Calendar size={48} className="mx-auto mb-4" />
             <h3 className="text-2xl font-bold mb-2">¿Listo para agendar tu turno?</h3>
             <p className="mb-6 opacity-90">Elegí el servicio que necesitás y reservá tu horario</p>
-            <Button variant="outline" className="bg-white text-primary hover:bg-gray-100">
+            <Button
+              variant="outline"
+              className="bg-white text-primary hover:bg-gray-100"
+              onClick={() => navigate(`/book-appointment/${SERVICES[0]?.id || 1}`)}
+            >
               Ver disponibilidad
             </Button>
           </Card>

@@ -5,9 +5,13 @@ import { Navbar } from './components/common/Navbar';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/client/LandingPage';
 import { ClientDashboardPage } from './pages/client/ClientDashboardPage';
+import { BookAppointmentPage } from './pages/client/BookAppointmentPage';
+import { PayDepositPage } from './pages/client/PayDepositPage';
 import { DashboardPage } from './pages/professional/DashboardPage';
 import { ReactNode } from 'react';
 import { PROFESSIONAL } from './data/professional';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -85,6 +89,9 @@ const AppRoutes = () => {
       {/* Public Professional Landing */}
       <Route path="/:professionalUrl" element={<ProfessionalLandingWrapper />} />
 
+      {/* Public Booking Route */}
+      <Route path="/book-appointment/:serviceId" element={<BookAppointmentPage />} />
+
       {/* Client Routes */}
       <Route path="/client/dashboard" element={
         <ProtectedRoute requiredRole="client">
@@ -92,6 +99,12 @@ const AppRoutes = () => {
             <Navbar />
             <ClientDashboardPage />
           </>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/pay-deposit" element={
+        <ProtectedRoute requiredRole="client">
+          <PayDepositPage />
         </ProtectedRoute>
       } />
 
@@ -127,6 +140,18 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </AuthProvider>
     </BrowserRouter>
   );

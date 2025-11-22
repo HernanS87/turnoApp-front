@@ -6,6 +6,7 @@ import { ProfessionalResponse, CreateProfessionalRequest } from '../../types/api
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
+import { getErrorMessage } from '../../utils/errorHandler';
 
 export const AdminDashboardPage = () => {
   const { user, logout } = useAuth();
@@ -114,7 +115,7 @@ export const AdminDashboardPage = () => {
       await loadProfessionals();
       handleCloseModal();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al guardar profesional');
+      setError(getErrorMessage(err, 'Error al guardar profesional'));
     } finally {
       setLoading(false);
     }
@@ -126,7 +127,7 @@ export const AdminDashboardPage = () => {
       await adminService.toggleProfessionalStatus(id);
       await loadProfessionals();
     } catch (err: any) {
-      setError('Error al cambiar estado');
+      setError(getErrorMessage(err, 'Error al cambiar estado'));
     } finally {
       setLoading(false);
     }

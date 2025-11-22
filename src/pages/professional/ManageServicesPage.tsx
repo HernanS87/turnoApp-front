@@ -7,6 +7,7 @@ import serviceService from '../../services/serviceService';
 import { ServiceResponse } from '../../types/api';
 import { Briefcase, Plus, Edit, Trash2, DollarSign, Clock, Percent, Power } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '../../utils/errorHandler';
 
 export const ManageServicesPage = () => {
   const [services, setServices] = useState<ServiceResponse[]>([]);
@@ -113,8 +114,7 @@ export const ManageServicesPage = () => {
       await loadServices();
       handleCloseModal();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Error al guardar servicio';
-      toast.error(errorMessage);
+      toast.error(getErrorMessage(error, 'Error al guardar servicio'));
     } finally {
       setLoading(false);
     }

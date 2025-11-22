@@ -111,8 +111,12 @@ export interface UpdateScheduleRequest {
   active?: boolean;
 }
 
-// API Error Response
+// API Error Response (matches backend ApiError.java)
 export interface ApiError {
-  error: string;
   timestamp: string;
+  status: number;
+  error: string;       // HTTP error name (e.g., "Bad Request", "Unauthorized")
+  message: string;     // Descriptive error message
+  path: string;
+  details?: string[];  // Optional validation errors
 }

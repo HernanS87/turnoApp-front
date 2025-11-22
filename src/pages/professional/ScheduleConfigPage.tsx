@@ -7,6 +7,7 @@ import { Calendar, Clock, Plus, Trash2, Power, Edit } from 'lucide-react';
 import { toast } from 'react-toastify';
 import scheduleService from '../../services/scheduleService';
 import { ScheduleResponse } from '../../types/api';
+import { getErrorMessage } from '../../utils/errorHandler';
 
 const DAYS_OF_WEEK = [
   { value: 0, label: 'Domingo', shortLabel: 'Dom' },
@@ -42,7 +43,7 @@ export const ScheduleConfigPage = () => {
       const data = await scheduleService.getSchedule();
       setScheduleSlots(data);
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Error al cargar la agenda');
+      toast.error(getErrorMessage(error, 'Error al cargar la agenda'));
     } finally {
       setLoading(false);
     }
@@ -116,8 +117,7 @@ export const ScheduleConfigPage = () => {
       await loadSchedule();
       handleCloseModal();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Error al guardar el horario';
-      toast.error(errorMessage);
+      toast.error(getErrorMessage(error, 'Error al guardar el horario'));
     }
   };
 
@@ -128,7 +128,7 @@ export const ScheduleConfigPage = () => {
         toast.success('Horario eliminado exitosamente');
         await loadSchedule();
       } catch (error: any) {
-        toast.error(error.response?.data?.error || 'Error al eliminar el horario');
+        toast.error(getErrorMessage(error, 'Error al eliminar el horario'));
       }
     }
   };
@@ -141,7 +141,7 @@ export const ScheduleConfigPage = () => {
       toast.success('Estado actualizado');
       await loadSchedule();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Error al actualizar el estado');
+      toast.error(getErrorMessage(error, 'Error al actualizar el estado'));
     }
   };
 

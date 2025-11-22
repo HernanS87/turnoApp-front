@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import authService from '../services/authService';
 import { LoginResponse, UserRole } from '../types/api';
+import { getErrorMessage } from '../utils/errorHandler';
 
 interface RegisterData {
   email: string;
@@ -72,7 +73,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       return { success: true };
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Credenciales inválidas';
+      const errorMessage = getErrorMessage(error, 'Credenciales inválidas');
       return { success: false, error: errorMessage };
     }
   };
@@ -95,7 +96,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       return { success: true };
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Error al registrar usuario';
+      const errorMessage = getErrorMessage(error, 'Error al registrar usuario');
       return { success: false, error: errorMessage };
     }
   };

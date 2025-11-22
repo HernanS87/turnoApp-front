@@ -1,49 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { Input } from '../../components/common/Input';
-import {
-  getAllServices,
-  createService,
-  updateService,
-  toggleServiceActive,
-  permanentlyDeleteService
-} from '../../utils/serviceStorage';
-import { useAuth } from '../../hooks/useAuth';
+import serviceService from '../../services/serviceService';
+import { ServiceResponse } from '../../types/api';
 import { Briefcase, Plus, Edit, Trash2, DollarSign, Clock, Percent, Power } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { Service } from '../../types';
 
 export const ManageServicesPage = () => {
-  const { user } = useAuth();
-  const professionalId = user?.professionalId || 1;
-  const [services, setServices] = useState<Service[]>(getAllServices(professionalId));
+  const [services, setServices] = useState<ServiceResponse[]>([]);
+  const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [editingService, setEditingService] = useState<ServiceResponse | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     price: 0,
-    durationMinutes: 60,
+    duration: 60,
     requiresDeposit: false,
     depositPercentage: 0,
-    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
-    category: ''
   });
 
-  const handleOpenModal = (service?: Service) => {
+  useEffect(() => {
+    loadServices();
+  }, []);
+
+  const loadServices = async () => {
+    setLoading(true);
+    try {
+      const data = await serviceService.getAllServices();
+      setServices(data);
+    } catch (error: any) {
+      toast.error('Error al cargar servicios');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenModal = (service?: ServiceResponse) => {
     if (service) {
       setEditingService(service);
       setFormData({
         name: service.name,
         description: service.description,
         price: service.price,
-        durationMinutes: service.durationMinutes,
-        requiresDeposit: service.requiresDeposit,
+        duration: service.duration,
+        requiresDeposit: service.depositPercentage > 0,
         depositPercentage: service.depositPercentage,
-        status: service.status,
-        category: service.category
       });
     } else {
       setEditingService(null);
@@ -51,11 +56,9 @@ export const ManageServicesPage = () => {
         name: '',
         description: '',
         price: 0,
-        durationMinutes: 60,
+        duration: 60,
         requiresDeposit: false,
         depositPercentage: 0,
-        status: 'ACTIVE',
-        category: ''
       });
     }
     setIsModalOpen(true);
@@ -66,21 +69,21 @@ export const ManageServicesPage = () => {
     setEditingService(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
+    // Validations
     if (formData.name.trim() === '') {
       toast.error('El nombre del servicio es obligatorio');
       return;
     }
 
-    if (formData.price < 0) {
-      toast.error('El precio no puede ser negativo');
+    if (formData.price <= 0) {
+      toast.error('El precio debe ser mayor a 0');
       return;
     }
 
-    if (formData.durationMinutes <= 0) {
+    if (formData.duration <= 0) {
       toast.error('La duración debe ser mayor a 0');
       return;
     }
@@ -90,44 +93,60 @@ export const ManageServicesPage = () => {
       return;
     }
 
-    if (editingService) {
-      // Update existing service
-      const updated = updateService(editingService.id, formData, professionalId);
-      if (updated) {
-        setServices(getAllServices(professionalId));
+    setLoading(true);
+    try {
+      const serviceData = {
+        name: formData.name,
+        description: formData.description,
+        price: formData.price,
+        duration: formData.duration,
+        depositPercentage: formData.requiresDeposit ? formData.depositPercentage : 0,
+      };
+
+      if (editingService) {
+        await serviceService.updateService(editingService.id, serviceData);
         toast.success('Servicio actualizado exitosamente');
-        handleCloseModal();
       } else {
-        toast.error('Error al actualizar el servicio');
+        await serviceService.createService(serviceData);
+        toast.success('Servicio creado exitosamente');
       }
-    } else {
-      // Create new service
-      const newService = createService(formData, professionalId);
-      setServices(getAllServices(professionalId));
-      toast.success('Servicio creado exitosamente');
+      await loadServices();
       handleCloseModal();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Error al guardar servicio';
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('¿Estás seguro de eliminar este servicio? Esta acción no se puede deshacer.')) {
-      const deleted = permanentlyDeleteService(id, professionalId);
-      if (deleted) {
-        setServices(getAllServices(professionalId));
-        toast.success('Servicio eliminado exitosamente');
-      } else {
-        toast.error('Error al eliminar el servicio');
-      }
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('¿Estás seguro de eliminar este servicio? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await serviceService.deleteService(id);
+      toast.success('Servicio eliminado exitosamente');
+      await loadServices();
+    } catch (error: any) {
+      toast.error('Error al eliminar servicio');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleToggleActive = (id: number) => {
-    const success = toggleServiceActive(id, professionalId);
-    if (success) {
-      setServices(getAllServices(professionalId));
-      toast.success('Estado actualizado');
-    } else {
-      toast.error('Error al actualizar el estado');
+  const handleToggleActive = async (id: number) => {
+    setLoading(true);
+    try {
+      await serviceService.toggleServiceStatus(id);
+      toast.success('Estado del servicio actualizado exitosamente');
+      await loadServices();
+    } catch {
+      toast.error('Error al actualizar estado del servicio');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -196,7 +215,9 @@ export const ManageServicesPage = () => {
             <h2 className="text-2xl font-bold text-gray-800">Servicios Activos</h2>
           </div>
 
-          {activeServices.length === 0 ? (
+          {loading && <p className="text-gray-500">Cargando...</p>}
+
+          {!loading && activeServices.length === 0 ? (
             <div className="py-12 text-center text-gray-500">
               <Briefcase size={48} className="mx-auto mb-4 opacity-50" />
               <p>No hay servicios activos</p>
@@ -214,13 +235,13 @@ export const ManageServicesPage = () => {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-grow">
                       <h3 className="text-lg font-semibold text-gray-800">{service.name}</h3>
-                      <p className="text-sm text-gray-500">{service.category}</p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleToggleActive(service.id)}
                         className="p-2 text-green-600 transition-colors bg-green-100 rounded-lg hover:bg-green-200"
                         title="Desactivar"
+                        disabled={loading}
                       >
                         <Power size={16} />
                       </button>
@@ -228,6 +249,7 @@ export const ManageServicesPage = () => {
                         onClick={() => handleOpenModal(service)}
                         className="p-2 text-blue-600 transition-colors bg-blue-100 rounded-lg hover:bg-blue-200"
                         title="Editar"
+                        disabled={loading}
                       >
                         <Edit size={16} />
                       </button>
@@ -235,6 +257,7 @@ export const ManageServicesPage = () => {
                         onClick={() => handleDelete(service.id)}
                         className="p-2 text-red-600 transition-colors bg-red-100 rounded-lg hover:bg-red-200"
                         title="Eliminar"
+                        disabled={loading}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -250,9 +273,9 @@ export const ManageServicesPage = () => {
                     </div>
                     <div className="flex items-center gap-1 text-gray-700">
                       <Clock size={16} className="text-primary" />
-                      <span>{service.durationMinutes} min</span>
+                      <span>{service.duration} min</span>
                     </div>
-                    {service.requiresDeposit && (
+                    {service.depositPercentage > 0 && (
                       <div className="flex items-center gap-1 px-2 py-1 text-yellow-700 rounded bg-yellow-50">
                         <Percent size={16} />
                         <span>Seña {service.depositPercentage}%</span>
@@ -282,13 +305,13 @@ export const ManageServicesPage = () => {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-grow">
                       <h3 className="text-lg font-semibold text-gray-600">{service.name}</h3>
-                      <p className="text-sm text-gray-400">{service.category}</p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleToggleActive(service.id)}
                         className="p-2 text-gray-600 transition-colors bg-gray-200 rounded-lg hover:bg-gray-300"
                         title="Activar"
+                        disabled={loading}
                       >
                         <Power size={16} />
                       </button>
@@ -296,6 +319,7 @@ export const ManageServicesPage = () => {
                         onClick={() => handleDelete(service.id)}
                         className="p-2 text-red-600 transition-colors bg-red-100 rounded-lg hover:bg-red-200"
                         title="Eliminar"
+                        disabled={loading}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -305,7 +329,7 @@ export const ManageServicesPage = () => {
                   <div className="flex flex-wrap gap-3 text-sm text-gray-500">
                     <span>${service.price.toLocaleString('es-AR')}</span>
                     <span>•</span>
-                    <span>{service.durationMinutes} min</span>
+                    <span>{service.duration} min</span>
                   </div>
                 </div>
               ))}
@@ -330,18 +354,7 @@ export const ManageServicesPage = () => {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Ej: Consulta Individual"
                 required
-              />
-            </div>
-
-            {/* Category */}
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">
-                Categoría
-              </label>
-              <Input
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="Ej: Terapia Individual"
+                disabled={loading}
               />
             </div>
 
@@ -356,6 +369,7 @@ export const ManageServicesPage = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 rows={3}
                 placeholder="Describe el servicio..."
+                disabled={loading}
               />
             </div>
 
@@ -372,6 +386,7 @@ export const ManageServicesPage = () => {
                   min="0"
                   step="100"
                   required
+                  disabled={loading}
                 />
               </div>
               <div>
@@ -380,11 +395,12 @@ export const ManageServicesPage = () => {
                 </label>
                 <Input
                   type="number"
-                  value={formData.durationMinutes}
-                  onChange={(e) => setFormData({ ...formData, durationMinutes: parseInt(e.target.value) || 0 })}
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) || 0 })}
                   min="1"
                   step="1"
                   required
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -399,9 +415,10 @@ export const ManageServicesPage = () => {
                   onChange={(e) => setFormData({
                     ...formData,
                     requiresDeposit: e.target.checked,
-                    depositPercentage: e.target.checked ? formData.depositPercentage : 0
+                    depositPercentage: e.target.checked ? formData.depositPercentage || 50 : 0
                   })}
                   className="w-4 h-4 border-gray-300 rounded text-primary focus:ring-primary"
+                  disabled={loading}
                 />
                 <label htmlFor="requiresDeposit" className="text-sm font-medium text-gray-700">
                   Requiere seña
@@ -420,6 +437,7 @@ export const ManageServicesPage = () => {
                     min="0"
                     max="100"
                     step="5"
+                    disabled={loading}
                   />
                   {formData.price > 0 && (
                     <p className="mt-2 text-sm text-gray-600">
@@ -432,11 +450,11 @@ export const ManageServicesPage = () => {
 
             {/* Actions */}
             <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={handleCloseModal} fullWidth>
+              <Button type="button" variant="outline" onClick={handleCloseModal} fullWidth disabled={loading}>
                 Cancelar
               </Button>
-              <Button type="submit" variant="primary" fullWidth>
-                {editingService ? 'Actualizar' : 'Crear Servicio'}
+              <Button type="submit" variant="primary" fullWidth disabled={loading}>
+                {loading ? 'Guardando...' : editingService ? 'Actualizar' : 'Crear Servicio'}
               </Button>
             </div>
           </form>

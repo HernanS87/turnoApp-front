@@ -60,6 +60,34 @@ export interface UpdateProfessionalRequest {
   customUrl?: string;
 }
 
+// Service DTOs
+export interface ServiceResponse {
+  id: number;
+  professionalId: number;
+  name: string;
+  description: string;
+  price: number;
+  duration: number;
+  depositPercentage: number;
+  status: Status;
+}
+
+export interface CreateServiceRequest {
+  name: string;
+  description: string;
+  price: number;
+  duration: number;
+  depositPercentage: number;
+}
+
+export interface UpdateServiceRequest {
+  name?: string;
+  description?: string;
+  price?: number;
+  duration?: number;
+  depositPercentage?: number;
+}
+
 // API Error Response
 export interface ApiError {
   error: string;

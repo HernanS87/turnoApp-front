@@ -1,20 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
-import {
-  getAllScheduleSlots,
-  createScheduleSlot,
-  updateScheduleSlot,
-  deleteScheduleSlot,
-  toggleScheduleSlotActive,
-  validateNoOverlap,
-  resetScheduleToDefaults
-} from '../../utils/scheduleStorage';
 import { useAuth } from '../../hooks/useAuth';
-import { Calendar, Clock, Plus, Trash2, Power, RotateCcw, Edit } from 'lucide-react';
+import { Calendar, Clock, Plus, Trash2, Power, Edit } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { ScheduleSlot } from '../../types';
+import scheduleService from '../../services/scheduleService';
+import { ScheduleResponse } from '../../types/api';
 
 const DAYS_OF_WEEK = [
   { value: 0, label: 'Domingo', shortLabel: 'Dom' },
@@ -28,10 +20,10 @@ const DAYS_OF_WEEK = [
 
 export const ScheduleConfigPage = () => {
   const { user } = useAuth();
-  const professionalId = user?.professionalId || 1;
-  const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>(getAllScheduleSlots(professionalId));
+  const [scheduleSlots, setScheduleSlots] = useState<ScheduleResponse[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSlot, setEditingSlot] = useState<ScheduleSlot | null>(null);
+  const [editingSlot, setEditingSlot] = useState<ScheduleResponse | null>(null);
   const [formData, setFormData] = useState({
     dayOfWeek: 1,
     startTime: '09:00',
@@ -39,9 +31,26 @@ export const ScheduleConfigPage = () => {
     active: true
   });
 
+  // Load schedule from backend
+  useEffect(() => {
+    loadSchedule();
+  }, []);
+
+  const loadSchedule = async () => {
+    try {
+      setLoading(true);
+      const data = await scheduleService.getSchedule();
+      setScheduleSlots(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Error al cargar la agenda');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Group slots by day
   const slotsByDay = useMemo(() => {
-    const grouped: { [key: number]: ScheduleSlot[] } = {};
+    const grouped: { [key: number]: ScheduleResponse[] } = {};
     DAYS_OF_WEEK.forEach(day => {
       grouped[day.value] = scheduleSlots
         .filter(slot => slot.dayOfWeek === day.value)
@@ -50,7 +59,7 @@ export const ScheduleConfigPage = () => {
     return grouped;
   }, [scheduleSlots]);
 
-  const handleOpenModal = (slot?: ScheduleSlot) => {
+  const handleOpenModal = (slot?: ScheduleResponse) => {
     if (slot) {
       setEditingSlot(slot);
       setFormData({
@@ -76,7 +85,7 @@ export const ScheduleConfigPage = () => {
     setEditingSlot(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation: end time must be after start time
@@ -85,72 +94,71 @@ export const ScheduleConfigPage = () => {
       return;
     }
 
-    // Validation: check for overlaps
-    const isValid = validateNoOverlap(
-      formData.dayOfWeek,
-      formData.startTime,
-      formData.endTime,
-      editingSlot?.id,
-      professionalId
-    );
-
-    if (!isValid) {
-      toast.error('El horario se solapa con otro bloque existente');
-      return;
-    }
-
-    if (editingSlot) {
-      // Update existing slot
-      const updated = updateScheduleSlot(editingSlot.id, formData, professionalId);
-      if (updated) {
-        setScheduleSlots(getAllScheduleSlots(professionalId));
+    try {
+      if (editingSlot) {
+        // Update existing slot
+        await scheduleService.updateSchedule(editingSlot.id, {
+          startTime: formData.startTime,
+          endTime: formData.endTime,
+          active: formData.active
+        });
         toast.success('Horario actualizado exitosamente');
-        handleCloseModal();
       } else {
-        toast.error('Error al actualizar el horario');
+        // Create new slot
+        await scheduleService.createSchedule({
+          dayOfWeek: formData.dayOfWeek,
+          startTime: formData.startTime,
+          endTime: formData.endTime
+        });
+        toast.success('Horario agregado exitosamente');
       }
-    } else {
-      // Create new slot
-      const newSlot = createScheduleSlot(formData, professionalId);
-      setScheduleSlots(getAllScheduleSlots(professionalId));
-      toast.success('Horario agregado exitosamente');
+
+      await loadSchedule();
       handleCloseModal();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Error al guardar el horario';
+      toast.error(errorMessage);
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (window.confirm('¿Estás seguro de eliminar este horario?')) {
-      const deleted = deleteScheduleSlot(id, professionalId);
-      if (deleted) {
-        setScheduleSlots(getAllScheduleSlots(professionalId));
+      try {
+        await scheduleService.deleteSchedule(id);
         toast.success('Horario eliminado exitosamente');
-      } else {
-        toast.error('Error al eliminar el horario');
+        await loadSchedule();
+      } catch (error: any) {
+        toast.error(error.response?.data?.error || 'Error al eliminar el horario');
       }
     }
   };
 
-  const handleToggleActive = (id: number) => {
-    const success = toggleScheduleSlotActive(id, professionalId);
-    if (success) {
-      setScheduleSlots(getAllScheduleSlots(professionalId));
+  const handleToggleActive = async (slot: ScheduleResponse) => {
+    try {
+      await scheduleService.updateSchedule(slot.id, {
+        active: !slot.active
+      });
       toast.success('Estado actualizado');
-    } else {
-      toast.error('Error al actualizar el estado');
-    }
-  };
-
-  const handleResetToDefaults = () => {
-    if (window.confirm('¿Estás seguro de restaurar la configuración por defecto? Se perderán todos los cambios.')) {
-      resetScheduleToDefaults(professionalId);
-      setScheduleSlots(getAllScheduleSlots(professionalId));
-      toast.success('Configuración restaurada');
+      await loadSchedule();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Error al actualizar el estado');
     }
   };
 
   const getDayLabel = (dayValue: number) => {
     return DAYS_OF_WEEK.find(d => d.value === dayValue)?.label || '';
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando agenda...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -163,10 +171,6 @@ export const ScheduleConfigPage = () => {
               <p className="text-gray-600">Definí tus horarios de atención semanales</p>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={handleResetToDefaults}>
-                <RotateCcw size={16} className="inline mr-2" />
-                Restaurar Defaults
-              </Button>
               <Button variant="primary" onClick={() => handleOpenModal()}>
                 <Plus size={16} className="inline mr-2" />
                 Agregar Horario
@@ -238,7 +242,7 @@ export const ScheduleConfigPage = () => {
 
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleToggleActive(slot.id)}
+                              onClick={() => handleToggleActive(slot)}
                               className={`p-1.5 rounded-lg transition-colors ${
                                 slot.active
                                   ? 'bg-green-100 text-green-600 hover:bg-green-200'

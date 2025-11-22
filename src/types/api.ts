@@ -88,6 +88,29 @@ export interface UpdateServiceRequest {
   depositPercentage?: number;
 }
 
+// Schedule DTOs
+export interface ScheduleResponse {
+  id: number;
+  professionalId: number;
+  dayOfWeek: number; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  startTime: string; // HH:mm format
+  endTime: string; // HH:mm format
+  active: boolean;
+  createdAt: string;
+}
+
+export interface CreateScheduleRequest {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface UpdateScheduleRequest {
+  startTime?: string;
+  endTime?: string;
+  active?: boolean;
+}
+
 // API Error Response
 export interface ApiError {
   error: string;

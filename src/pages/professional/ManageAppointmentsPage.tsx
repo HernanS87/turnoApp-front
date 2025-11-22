@@ -3,7 +3,7 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { getAllAppointments, updateAppointment } from '../../utils/appointmentStorage';
-import { CLIENTS } from '../../data/clients';
+import { getAllClients } from '../../utils/clientStorage';
 import { getAllServices } from '../../utils/serviceStorage';
 import { useAuth } from '../../hooks/useAuth';
 import { Calendar, Clock, User, Phone, Mail, FileText, Filter, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
@@ -37,8 +37,9 @@ export const ManageAppointmentsPage = () => {
 
   // Enrich appointments with client and service data
   const appointmentsWithDetails: AppointmentWithDetails[] = useMemo(() => {
+    const allClients = getAllClients();
     return appointments.map(apt => {
-      const client = CLIENTS.find(c => c.id === apt.clientId);
+      const client = allClients.find(c => c.id === apt.clientId);
       const service = services.find(s => s.id === apt.serviceId);
       return { ...apt, client, service };
     });

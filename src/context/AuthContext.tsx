@@ -1,7 +1,6 @@
 import { createContext, useState, useEffect, ReactNode } from 'react';
-import { User, UserRole, Client } from '../types';
-import { USERS } from '../data/users';
-import { CLIENTS } from '../data/clients';
+import authService from '../services/authService';
+import { LoginResponse, UserRole } from '../types/api';
 
 interface RegisterData {
   email: string;
@@ -9,12 +8,22 @@ interface RegisterData {
   firstName: string;
   lastName: string;
   phone: string;
+  birthDate: string;
+}
+
+interface AuthUser {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  professionalId: number | null;
 }
 
 interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => { success: boolean; error?: string; user?: User };
-  register: (data: RegisterData) => { success: boolean; error?: string; user?: User };
+  user: AuthUser | null;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   loading: boolean;
 }
@@ -26,105 +35,74 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Load user from localStorage on init
-    const storedUser = localStorage.getItem('user');
+    const storedUser = authService.getStoredUser();
     if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('user');
-      }
+      setUser({
+        id: storedUser.userId,
+        email: storedUser.email,
+        firstName: storedUser.firstName,
+        lastName: storedUser.lastName,
+        role: storedUser.role,
+        professionalId: storedUser.professionalId,
+      });
     }
     setLoading(false);
   }, []);
 
-  const login = (email: string, password: string) => {
-    // Get stored users from localStorage
-    const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
+  const login = async (email: string, password: string) => {
+    try {
+      const response: LoginResponse = await authService.login({ email, password });
 
-    // Search in both hardcoded and stored users
-    const allUsers = [...USERS, ...storedUsers];
-    const foundUser = allUsers.find(
-      u => u.email === email && u.password === password
-    );
-
-    if (foundUser) {
-      const userData: User = {
-        id: foundUser.id,
-        email: foundUser.email,
-        password: foundUser.password,
-        role: foundUser.role,
-        professionalId: foundUser.professionalId,
-        clientId: foundUser.clientId
+      const userData: AuthUser = {
+        id: response.userId,
+        email: response.email,
+        firstName: response.firstName,
+        lastName: response.lastName,
+        role: response.role,
+        professionalId: response.professionalId,
       };
 
+      authService.saveAuthData(response);
       setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      return { success: true, user: userData };
-    }
 
-    return { success: false, error: 'Credenciales inválidas' };
+      return { success: true };
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Credenciales inválidas';
+      return { success: false, error: errorMessage };
+    }
   };
 
-  const register = (data: RegisterData) => {
-    // Get stored users and clients from localStorage
-    const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
-    const storedClients = JSON.parse(localStorage.getItem('clients') || '[]');
+  const register = async (data: RegisterData) => {
+    try {
+      const response: LoginResponse = await authService.register(data);
 
-    // Check if email already exists in both hardcoded and stored users
-    const allUsers = [...USERS, ...storedUsers];
-    const existingUser = allUsers.find(u => u.email === data.email);
-    if (existingUser) {
-      return { success: false, error: 'El email ya está registrado' };
+      const userData: AuthUser = {
+        id: response.userId,
+        email: response.email,
+        firstName: response.firstName,
+        lastName: response.lastName,
+        role: response.role,
+        professionalId: response.professionalId,
+      };
+
+      authService.saveAuthData(response);
+      setUser(userData);
+
+      return { success: true };
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Error al registrar usuario';
+      return { success: false, error: errorMessage };
     }
-
-    // Generate new IDs
-    const allClients = [...CLIENTS, ...storedClients];
-    const newUserId = allUsers.reduce((max, u) => Math.max(max, u.id), 0) + 1;
-    const newClientId = allClients.reduce((max, c) => Math.max(max, c.id), 0) + 1;
-
-    // Create new client
-    const newClient: Client = {
-      id: newClientId,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email,
-      phone: data.phone,
-      birthDate: '', // Optional field, can be filled later
-      registrationDate: new Date().toISOString().split('T')[0],
-      status: 'ACTIVE'
-    };
-
-    // Create new user
-    const newUser: User = {
-      id: newUserId,
-      email: data.email,
-      password: data.password,
-      role: 'client',
-      clientId: newClientId
-    };
-
-    // Save to localStorage
-    storedUsers.push(newUser);
-    storedClients.push(newClient);
-    localStorage.setItem('users', JSON.stringify(storedUsers));
-    localStorage.setItem('clients', JSON.stringify(storedClients));
-
-    // Auto-login
-    setUser(newUser);
-    localStorage.setItem('user', JSON.stringify(newUser));
-
-    return { success: true, user: newUser };
   };
 
   const logout = () => {
+    authService.logout();
     setUser(null);
-    localStorage.removeItem('user');
   };
 
   return (

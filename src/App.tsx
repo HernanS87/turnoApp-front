@@ -12,6 +12,7 @@ import { ManageAppointmentsPage } from './pages/professional/ManageAppointmentsP
 import { ScheduleConfigPage } from './pages/professional/ScheduleConfigPage';
 import { ManageServicesPage } from './pages/professional/ManageServicesPage';
 import { CustomizationPage } from './pages/professional/CustomizationPage';
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 import { ReactNode } from 'react';
 import { getProfessionalByUrl } from './data/professional';
 import { ToastContainer } from 'react-toastify';
@@ -20,7 +21,7 @@ import 'react-toastify/dist/ReactToastify.css';
 // Protected Route Component
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRole?: 'professional' | 'client';
+  requiredRole?: 'ADMIN' | 'PROFESSIONAL' | 'CLIENT';
 }
 
 const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
@@ -94,12 +95,21 @@ const AppRoutes = () => {
       {/* Public Routes */}
       <Route path="/login" element={
         user ? (
-          user.role === 'professional' ?
-            <Navigate to="/professional/dashboard" replace /> :
-            <Navigate to="/client/dashboard" replace />
+          user.role === 'ADMIN' ?
+            <Navigate to="/admin/dashboard" replace /> :
+            user.role === 'PROFESSIONAL' ?
+              <Navigate to="/professional/dashboard" replace /> :
+              <Navigate to="/client/dashboard" replace />
         ) : (
           <LoginPage />
         )
+      } />
+
+      {/* Admin Routes */}
+      <Route path="/admin/dashboard" element={
+        <ProtectedRoute requiredRole="ADMIN">
+          <AdminDashboardPage />
+        </ProtectedRoute>
       } />
 
       {/* Public Professional Landing */}
@@ -110,7 +120,7 @@ const AppRoutes = () => {
 
       {/* Client Routes */}
       <Route path="/client/dashboard" element={
-        <ProtectedRoute requiredRole="client">
+        <ProtectedRoute requiredRole="CLIENT">
           <>
             <Navbar />
             <ClientDashboardPage />
@@ -119,14 +129,14 @@ const AppRoutes = () => {
       } />
 
       <Route path="/pay-deposit" element={
-        <ProtectedRoute requiredRole="client">
+        <ProtectedRoute requiredRole="CLIENT">
           <PayDepositPage />
         </ProtectedRoute>
       } />
 
       {/* Professional Routes */}
       <Route path="/professional/dashboard" element={
-        <ProtectedRoute requiredRole="professional">
+        <ProtectedRoute requiredRole="PROFESSIONAL">
           <>
             <Navbar />
             <DashboardPage />
@@ -135,7 +145,7 @@ const AppRoutes = () => {
       } />
 
       <Route path="/professional/appointments" element={
-        <ProtectedRoute requiredRole="professional">
+        <ProtectedRoute requiredRole="PROFESSIONAL">
           <>
             <Navbar />
             <ManageAppointmentsPage />
@@ -144,7 +154,7 @@ const AppRoutes = () => {
       } />
 
       <Route path="/professional/schedule" element={
-        <ProtectedRoute requiredRole="professional">
+        <ProtectedRoute requiredRole="PROFESSIONAL">
           <>
             <Navbar />
             <ScheduleConfigPage />
@@ -153,7 +163,7 @@ const AppRoutes = () => {
       } />
 
       <Route path="/professional/services" element={
-        <ProtectedRoute requiredRole="professional">
+        <ProtectedRoute requiredRole="PROFESSIONAL">
           <>
             <Navbar />
             <ManageServicesPage />
@@ -162,7 +172,7 @@ const AppRoutes = () => {
       } />
 
       <Route path="/professional/customization" element={
-        <ProtectedRoute requiredRole="professional">
+        <ProtectedRoute requiredRole="PROFESSIONAL">
           <>
             <Navbar />
             <CustomizationPage />
@@ -173,9 +183,11 @@ const AppRoutes = () => {
       {/* Default Route */}
       <Route path="/" element={
         user ? (
-          user.role === 'professional' ?
-            <Navigate to="/professional/dashboard" replace /> :
-            <Navigate to="/client/dashboard" replace />
+          user.role === 'ADMIN' ?
+            <Navigate to="/admin/dashboard" replace /> :
+            user.role === 'PROFESSIONAL' ?
+              <Navigate to="/professional/dashboard" replace /> :
+              <Navigate to="/client/dashboard" replace />
         ) : (
           <Navigate to="/login" replace />
         )

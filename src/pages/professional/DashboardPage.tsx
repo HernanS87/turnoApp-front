@@ -1,6 +1,6 @@
 import { Card } from '../../components/common/Card';
 import { getAllAppointments } from '../../utils/appointmentStorage';
-import { CLIENTS } from '../../data/clients';
+import { getAllClients } from '../../utils/clientStorage';
 import { getAllServices } from '../../utils/serviceStorage';
 import { useAuth } from '../../hooks/useAuth';
 import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp } from 'lucide-react';
@@ -23,8 +23,9 @@ export const DashboardPage = () => {
   const confirmedAppointments = professionalAppointments.filter(apt => apt.status === 'CONFIRMED');
 
   // Today's appointments with details
+  const allClients = getAllClients();
   const todayAppointmentsWithDetails = todayAppointments.map(apt => {
-    const client = CLIENTS.find(c => c.id === apt.clientId);
+    const client = allClients.find(c => c.id === apt.clientId);
     const service = services.find(s => s.id === apt.serviceId);
     return { ...apt, client, service };
   }).sort((a, b) => a.startTime.localeCompare(b.startTime));

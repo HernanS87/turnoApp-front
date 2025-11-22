@@ -4,47 +4,77 @@ import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { Card } from '../components/common/Card';
-import { UserRole } from '../types';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { login, user } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    const result = login(email, password);
+    try {
+      const result = await login(email, password);
 
-    if (result.success && result.user) {
-      // Redirect based on role
-      if (result.user.role === 'professional') {
-        navigate('/professional/dashboard');
+      if (result.success) {
+        // Wait for user state to update
+        setTimeout(() => {
+          const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+          const role = storedUser.role;
+
+          // Redirect based on role
+          if (role === 'ADMIN') {
+            navigate('/admin/dashboard');
+          } else if (role === 'PROFESSIONAL') {
+            navigate('/professional/dashboard');
+          } else {
+            navigate('/client/landing');
+          }
+        }, 100);
       } else {
-        navigate('/client/landing');
+        setError(result.error || 'Error al iniciar sesión');
       }
-    } else {
-      setError(result.error || 'Error al iniciar sesión');
+    } catch (err) {
+      setError('Error al conectar con el servidor');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleQuickLogin = (userEmail: string, userRole: UserRole) => {
+  const handleQuickLogin = async (userEmail: string, userPassword: string) => {
     setEmail(userEmail);
-    setPassword('123456');
+    setPassword(userPassword);
+    setError('');
+    setLoading(true);
 
-    setTimeout(() => {
-      const result = login(userEmail, '123456');
-      if (result.success && result.user) {
-        if (result.user.role === 'professional') {
-          navigate('/professional/dashboard');
-        } else {
-          navigate('/client/landing');
-        }
+    try {
+      const result = await login(userEmail, userPassword);
+      if (result.success) {
+        setTimeout(() => {
+          const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+          const role = storedUser.role;
+
+          if (role === 'ADMIN') {
+            navigate('/admin/dashboard');
+          } else if (role === 'PROFESSIONAL') {
+            navigate('/professional/dashboard');
+          } else {
+            navigate('/client/landing');
+          }
+        }, 100);
+      } else {
+        setError(result.error || 'Error al iniciar sesión');
       }
-    }, 100);
+    } catch (err) {
+      setError('Error al conectar con el servidor');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,6 +93,7 @@ export const LoginPage = () => {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="tu@email.com"
             required
+            disabled={loading}
           />
 
           <Input
@@ -72,6 +103,7 @@ export const LoginPage = () => {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="******"
             required
+            disabled={loading}
           />
 
           {error && (
@@ -80,8 +112,8 @@ export const LoginPage = () => {
             </div>
           )}
 
-          <Button type="submit" fullWidth>
-            Iniciar Sesión
+          <Button type="submit" fullWidth disabled={loading}>
+            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </Button>
         </form>
 
@@ -91,24 +123,26 @@ export const LoginPage = () => {
             <Button
               variant="outline"
               fullWidth
-              onClick={() => handleQuickLogin('maria@psicologia.com', 'professional')}
+              disabled={loading}
+              onClick={() => handleQuickLogin('admin@turnoapp.com', 'admin123')}
             >
-              Ingresar como Profesional
+              Ingresar como Admin
             </Button>
             <Button
               variant="outline"
               fullWidth
-              onClick={() => handleQuickLogin('juan@mail.com', 'client')}
+              disabled={loading}
+              onClick={() => handleQuickLogin('maria@psicologia.com', '123456')}
             >
-              Ingresar como Cliente
+              Ingresar como Profesional
             </Button>
           </div>
         </div>
 
         <div className="mt-4 text-center text-xs text-gray-500">
-          <p>Usuarios de prueba - Contraseña: 123456</p>
-          <p className="mt-1">Profesional: maria@psicologia.com</p>
-          <p>Cliente: juan@mail.com, ana@mail.com, pedro@mail.com</p>
+          <p>Usuarios de prueba:</p>
+          <p className="mt-1">Admin: admin@turnoapp.com / admin123</p>
+          <p>Profesional: maria@psicologia.com / 123456</p>
         </div>
       </Card>
     </div>

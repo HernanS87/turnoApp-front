@@ -19,16 +19,16 @@ export const Navbar = () => {
 
   return (
     <nav className="bg-white shadow-md">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex justify-between items-center">
+      <div className="container px-4 py-4 mx-auto">
+        <div className="flex items-center justify-between">
           <Link to="/" className="text-2xl font-bold text-primary">
             TurnoApp
           </Link>
 
           <div className="flex items-center gap-6">
             {/* Navigation Links for Professional */}
-            {user?.role === 'professional' && (
-              <div className="hidden md:flex items-center gap-1">
+            {user?.role === 'PROFESSIONAL' && (
+              <div className="items-center hidden gap-1 md:flex">
                 {professionalLinks.map(link => {
                   const Icon = link.icon;
                   return (
@@ -53,9 +53,9 @@ export const Navbar = () => {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-gray-700">
                   <User size={20} />
-                  <span className="text-sm hidden sm:inline">{user.email}</span>
-                  <span className="text-xs bg-primary text-white px-2 py-1 rounded">
-                    {user.role === 'professional' ? 'Profesional' : 'Cliente'}
+                  <span className="hidden text-sm sm:inline">{user.email}</span>
+                  <span className="px-2 py-1 text-xs text-white rounded bg-primary">
+                    {user.role === 'PROFESSIONAL' ? 'Profesional' : 'Cliente'}
                   </span>
                 </div>
                 <Button
@@ -72,8 +72,8 @@ export const Navbar = () => {
         </div>
 
         {/* Mobile Navigation Menu for Professional */}
-        {user?.role === 'professional' && (
-          <div className="md:hidden mt-4 pt-4 border-t border-gray-200">
+        {user?.role === 'PROFESSIONAL' && (
+          <div className="pt-4 mt-4 border-t border-gray-200 md:hidden">
             <div className="grid grid-cols-2 gap-2">
               {professionalLinks.map(link => {
                 const Icon = link.icon;

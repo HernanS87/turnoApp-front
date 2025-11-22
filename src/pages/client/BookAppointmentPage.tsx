@@ -9,9 +9,11 @@ import { AuthModal } from '../../components/auth/AuthModal';
 import { SERVICES } from '../../data/services';
 import { PROFESSIONAL } from '../../data/professional';
 import { getAvailableDates, getAvailableSlots, calculateEndTime } from '../../utils/availabilityUtils';
+import { createAppointment } from '../../utils/appointmentStorage';
 import { ArrowLeft, Clock, DollarSign, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'react-toastify';
 
 export const BookAppointmentPage = () => {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -75,13 +77,29 @@ export const BookAppointmentPage = () => {
       // Requires deposit → Go to payment page
       navigate('/pay-deposit');
     } else {
-      // No deposit required → Go directly to create appointment
-      navigate('/client/dashboard', {
-        state: {
-          createAppointment: true,
-          pendingAppointment: sessionStorage.getItem('pendingAppointment')
-        }
+      // No deposit required → Create appointment immediately and go to dashboard
+      if (!user?.clientId || !selectedDate || !selectedTime || !service) {
+        toast.error('Error al crear el turno');
+        return;
+      }
+
+      const endTime = calculateEndTime(selectedTime, service.durationMinutes);
+      createAppointment({
+        professionalId: PROFESSIONAL.id,
+        clientId: user.clientId,
+        serviceId: service.id,
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        startTime: selectedTime,
+        endTime,
+        status: 'CONFIRMED',
+        notes: ''
       });
+
+      // Clear pending appointment from sessionStorage
+      sessionStorage.removeItem('pendingAppointment');
+
+      toast.success('¡Turno agendado exitosamente!');
+      navigate('/client/dashboard');
     }
   };
 

@@ -1,9 +1,13 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { getAllServices } from '../../utils/serviceStorage';
-import { Calendar, Clock, MapPin, Phone, Mail, Instagram, Facebook, Linkedin } from 'lucide-react';
+import serviceService from '../../services/serviceService';
+import { getErrorMessage } from '../../utils/errorHandler';
+import { Clock, MapPin, Phone, Mail, Instagram, Facebook, Linkedin } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { Professional, SiteConfig } from '../../types';
+import type { ServiceResponse } from '../../types/api';
 
 interface LandingPageProps {
   professional: Professional;
@@ -13,6 +17,8 @@ const getStorageKey = (professionalId: number) => `siteConfig_${professionalId}`
 
 export const LandingPage = ({ professional }: LandingPageProps) => {
   const navigate = useNavigate();
+  const [services, setServices] = useState<ServiceResponse[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Load custom config from localStorage or use default
   const siteConfig: SiteConfig = (() => {
@@ -20,8 +26,24 @@ export const LandingPage = ({ professional }: LandingPageProps) => {
     return stored ? JSON.parse(stored) : professional.siteConfig;
   })();
 
-  // Load services for this professional
-  const services = getAllServices(professional.id).filter(s => s.status === 'ACTIVE');
+  // Load services from API on mount
+  useEffect(() => {
+    const loadServices = async () => {
+      setLoading(true);
+      try {
+        const data = await serviceService.getPublicServicesByCustomUrl(professional.customUrl);
+        // Backend already returns only ACTIVE services
+        setServices(data);
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Error al cargar servicios'));
+        setServices([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadServices();
+  }, [professional.customUrl]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -121,7 +143,14 @@ export const LandingPage = ({ professional }: LandingPageProps) => {
 
           {/* Services Section */}
           <h2 className="text-3xl font-bold text-gray-800 mb-6">Servicios</h2>
-          {services.length === 0 ? (
+          {loading ? (
+            <Card>
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-gray-600">Cargando servicios...</p>
+              </div>
+            </Card>
+          ) : services.length === 0 ? (
             <Card>
               <div className="text-center py-12 text-gray-500">
                 <p className="text-lg">Este profesional aún no ha configurado sus servicios.</p>
@@ -139,13 +168,13 @@ export const LandingPage = ({ professional }: LandingPageProps) => {
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center gap-2 text-gray-700">
                         <Clock size={16} style={{ color: siteConfig.primaryColor }} />
-                        <span className="text-sm">{service.durationMinutes} minutos</span>
+                        <span className="text-sm">{service.duration} minutos</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-2xl font-bold" style={{ color: siteConfig.primaryColor }}>
                           {service.price === 0 ? 'Gratis' : `$${service.price.toLocaleString()}`}
                         </span>
-                        {service.requiresDeposit && (
+                        {service.depositPercentage > 0 && (
                           <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                             Requiere seña {service.depositPercentage}%
                           </span>
@@ -156,7 +185,7 @@ export const LandingPage = ({ professional }: LandingPageProps) => {
                     <button
                       className="w-full px-4 py-2 rounded-lg font-medium text-white transition-opacity hover:opacity-90"
                       style={{ backgroundColor: siteConfig.primaryColor }}
-                      onClick={() => navigate(`/book-appointment/${service.id}`)}
+                      onClick={() => navigate(`/${professional.customUrl}/book/${service.id}`)}
                     >
                       Agendar turno
                     </button>
@@ -166,24 +195,6 @@ export const LandingPage = ({ professional }: LandingPageProps) => {
             </div>
           )}
 
-          {/* CTA Section */}
-          {services.length > 0 && (
-            <div
-              className="text-white text-center p-8 rounded-lg"
-              style={{ backgroundColor: siteConfig.primaryColor }}
-            >
-              <Calendar size={48} className="mx-auto mb-4" />
-              <h3 className="text-2xl font-bold mb-2">¿Listo para agendar tu turno?</h3>
-              <p className="mb-6 opacity-90">Elegí el servicio que necesitás y reservá tu horario</p>
-              <button
-                className="px-6 py-3 rounded-lg font-medium border-2 border-white bg-white hover:bg-opacity-90 transition-opacity"
-                style={{ color: siteConfig.primaryColor }}
-                onClick={() => navigate(`/book-appointment/${services[0]?.id || 1}`)}
-              >
-                Ver disponibilidad
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

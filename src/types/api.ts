@@ -111,6 +111,64 @@ export interface UpdateScheduleRequest {
   active?: boolean;
 }
 
+// Appointment DTOs
+export type AppointmentStatus = 'CONFIRMED' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED';
+
+export interface AppointmentResponse {
+  id: number;
+  professionalId: number;
+  professionalName: string;
+  clientId: number;
+  clientName: string;
+  clientEmail: string;
+  serviceId: number;
+  serviceName: string;
+  serviceDuration: number;
+  date: string; // yyyy-MM-dd
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  status: AppointmentStatus;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAppointmentRequest {
+  serviceId: number;
+  date: string; // yyyy-MM-dd
+  startTime: string; // HH:mm
+  notes?: string;
+}
+
+export interface UpdateAppointmentStatusRequest {
+  status: AppointmentStatus;
+}
+
+export interface DateAvailability {
+  date: string; // yyyy-MM-dd
+  hasAvailability: boolean;
+}
+
+export interface AvailabilityDateResponse {
+  professionalId: number;
+  serviceId: number;
+  availability: DateAvailability[];
+}
+
+export interface TimeSlot {
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  available: boolean;
+}
+
+export interface AvailabilitySlotResponse {
+  professionalId: number;
+  serviceId: number;
+  date: string; // yyyy-MM-dd
+  serviceDuration: number;
+  slots: TimeSlot[];
+}
+
 // API Error Response (matches backend ApiError.java)
 export interface ApiError {
   timestamp: string;

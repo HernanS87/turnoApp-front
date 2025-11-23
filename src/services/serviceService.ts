@@ -11,6 +11,16 @@ class ServiceService {
     return response.data;
   }
 
+  async getPublicServicesByCustomUrl(customUrl: string): Promise<ServiceResponse[]> {
+    const response = await api.get<ServiceResponse[]>(`/services/public/by-url/${customUrl}`);
+    return response.data;
+  }
+
+  async getPublicServiceByCustomUrlAndId(customUrl: string, serviceId: number): Promise<ServiceResponse> {
+    const response = await api.get<ServiceResponse>(`/services/public/by-url/${customUrl}/${serviceId}`);
+    return response.data;
+  }
+
   async getServiceById(id: number): Promise<ServiceResponse> {
     const response = await api.get<ServiceResponse>(`/services/${id}`);
     return response.data;

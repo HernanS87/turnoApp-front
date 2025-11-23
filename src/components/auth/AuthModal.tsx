@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
 import { Button } from '../common/Button';
-import { useAuth } from '../../hooks/useAuth';
+import authService from '../../services/authService';
+import { getErrorMessage } from '../../utils/errorHandler';
+import { toast } from 'react-toastify';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -13,7 +15,6 @@ interface AuthModalProps {
 type TabType = 'login' | 'register';
 
 export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
-  const { login, register } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('login');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,7 +31,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     password: '',
     firstName: '',
     lastName: '',
-    phone: ''
+    phone: '',
+    birthDate: ''
   });
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -45,15 +47,24 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
       return;
     }
 
-    const result = login(loginData.email, loginData.password);
+    try {
+      const response = await authService.login(loginData);
 
-    if (result.success) {
+      // Validate role is CLIENT
+      if (response.role !== 'CLIENT') {
+        setError('Solo los clientes pueden agendar turnos. Por favor iniciá sesión con una cuenta de cliente.');
+        setLoading(false);
+        return;
+      }
+
+      authService.saveAuthData(response);
+      toast.success('¡Bienvenido!');
       onSuccess();
-    } else {
-      setError(result.error || 'Error al iniciar sesión');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Error al iniciar sesión'));
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -62,7 +73,8 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     setLoading(true);
 
     // Basic validation
-    if (!registerData.email || !registerData.password || !registerData.firstName || !registerData.lastName || !registerData.phone) {
+    if (!registerData.email || !registerData.password || !registerData.firstName ||
+        !registerData.lastName || !registerData.phone || !registerData.birthDate) {
       setError('Por favor completá todos los campos');
       setLoading(false);
       return;
@@ -83,21 +95,22 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
       return;
     }
 
-    const result = register(registerData);
-
-    if (result.success) {
+    try {
+      const response = await authService.register(registerData);
+      authService.saveAuthData(response);
+      toast.success('¡Cuenta creada exitosamente!');
       onSuccess();
-    } else {
-      setError(result.error || 'Error al registrarse');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Error al registrarse'));
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleClose = () => {
     setError('');
     setLoginData({ email: '', password: '' });
-    setRegisterData({ email: '', password: '', firstName: '', lastName: '', phone: '' });
+    setRegisterData({ email: '', password: '', firstName: '', lastName: '', phone: '', birthDate: '' });
     onClose();
   };
 
@@ -205,6 +218,13 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
               placeholder="261-555-1234"
               value={registerData.phone}
               onChange={(e) => setRegisterData({ ...registerData, phone: e.target.value })}
+              required
+            />
+            <Input
+              label="Fecha de nacimiento"
+              type="date"
+              value={registerData.birthDate}
+              onChange={(e) => setRegisterData({ ...registerData, birthDate: e.target.value })}
               required
             />
             <Input

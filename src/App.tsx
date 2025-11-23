@@ -116,7 +116,7 @@ const AppRoutes = () => {
       <Route path="/:professionalUrl" element={<ProfessionalLandingWrapper />} />
 
       {/* Public Booking Route */}
-      <Route path="/book-appointment/:serviceId" element={<BookAppointmentPage />} />
+      <Route path="/:customUrl/book/:serviceId" element={<BookAppointmentPage />} />
 
       {/* Client Routes */}
       <Route path="/client/dashboard" element={

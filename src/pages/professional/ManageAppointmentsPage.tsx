@@ -1,49 +1,49 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
-import { getAllAppointments, updateAppointment } from '../../utils/appointmentStorage';
-import { getAllClients } from '../../utils/clientStorage';
-import { getAllServices } from '../../utils/serviceStorage';
+import appointmentService from '../../services/appointmentService';
+import { getErrorMessage } from '../../utils/errorHandler';
 import { useAuth } from '../../hooks/useAuth';
-import { Calendar, Clock, User, Phone, Mail, FileText, Filter, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { format, parseISO, isPast, isFuture } from 'date-fns';
+import { Calendar, Clock, User, Mail, FileText, Filter, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { format, parseISO, isPast } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'react-toastify';
-import { Appointment, AppointmentStatus, Client, Service } from '../../types';
+import type { AppointmentResponse, AppointmentStatus } from '../../types/api';
 
-type AppointmentWithDetails = Appointment & {
-  client?: Client;
-  service?: Service;
-};
-
-type StatusFilter = 'ALL' | AppointmentStatus;
+type StatusFilter = 'ALL' | AppointmentStatus | 'NO_SHOW';
 type DateFilter = 'ALL' | 'PAST' | 'FUTURE' | 'TODAY';
 
 export const ManageAppointmentsPage = () => {
   const { user } = useAuth();
-  const professionalId = user?.professionalId || 1;
 
-  // Get appointments and services for this professional
-  const allAppointments = getAllAppointments();
-  const professionalAppointments = allAppointments.filter(apt => apt.professionalId === professionalId);
-  const services = getAllServices(professionalId);
-
-  const [appointments, setAppointments] = useState<Appointment[]>(professionalAppointments);
+  const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
-  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithDetails | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentResponse | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Enrich appointments with client and service data
-  const appointmentsWithDetails: AppointmentWithDetails[] = useMemo(() => {
-    const allClients = getAllClients();
-    return appointments.map(apt => {
-      const client = allClients.find(c => c.id === apt.clientId);
-      const service = services.find(s => s.id === apt.serviceId);
-      return { ...apt, client, service };
-    });
-  }, [appointments, services]);
+  // Load appointments from API on mount
+  useEffect(() => {
+    const loadAppointments = async () => {
+      setLoading(true);
+      try {
+        const data = await appointmentService.getAppointments();
+        setAppointments(data);
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Error al cargar turnos'));
+        setAppointments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAppointments();
+  }, []);
+
+  // Appointments are already enriched from backend (no need for useMemo)
+  const appointmentsWithDetails = appointments;
 
   // Filter appointments
   const filteredAppointments = useMemo(() => {
@@ -85,19 +85,21 @@ export const ManageAppointmentsPage = () => {
     });
   }, [appointmentsWithDetails, statusFilter, dateFilter]);
 
-  const handleUpdateStatus = (id: number, newStatus: AppointmentStatus) => {
-    const updated = updateAppointment(id, { status: newStatus });
-    if (updated) {
-      const allAppointments = getAllAppointments();
-      const professionalAppointments = allAppointments.filter(apt => apt.professionalId === professionalId);
-      setAppointments(professionalAppointments);
+  const handleUpdateStatus = async (id: number, newStatus: AppointmentStatus) => {
+    try {
+      await appointmentService.updateAppointmentStatus(id, newStatus);
+
+      // Reload appointments
+      const data = await appointmentService.getAppointments();
+      setAppointments(data);
+
       toast.success(`Turno ${getStatusLabel(newStatus).toLowerCase()} exitosamente`);
-    } else {
-      toast.error('Error al actualizar el turno');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Error al actualizar el turno'));
     }
   };
 
-  const handleViewDetails = (appointment: AppointmentWithDetails) => {
+  const handleViewDetails = (appointment: AppointmentResponse) => {
     setSelectedAppointment(appointment);
     setIsModalOpen(true);
   };
@@ -106,7 +108,7 @@ export const ManageAppointmentsPage = () => {
     switch (status) {
       case 'CONFIRMED':
         return 'bg-green-100 text-green-800 border-green-200';
-      case 'PENDING':
+      case 'NO_SHOW':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'CANCELLED':
         return 'bg-red-100 text-red-800 border-red-200';
@@ -119,8 +121,8 @@ export const ManageAppointmentsPage = () => {
     switch (status) {
       case 'CONFIRMED':
         return 'Confirmado';
-      case 'PENDING':
-        return 'Pendiente';
+      case 'NO_SHOW':
+        return 'Ausente';
       case 'CANCELLED':
         return 'Cancelado';
       case 'COMPLETED':
@@ -132,7 +134,7 @@ export const ManageAppointmentsPage = () => {
     switch (status) {
       case 'CONFIRMED':
         return <CheckCircle size={16} />;
-      case 'PENDING':
+      case 'NO_SHOW':
         return <AlertCircle size={16} />;
       case 'CANCELLED':
         return <XCircle size={16} />;
@@ -141,9 +143,9 @@ export const ManageAppointmentsPage = () => {
     }
   };
 
-  const canConfirm = (apt: Appointment) => apt.status === 'PENDING';
-  const canCancel = (apt: Appointment) => apt.status === 'PENDING' || apt.status === 'CONFIRMED';
-  const canComplete = (apt: Appointment) => apt.status === 'CONFIRMED' && isPast(parseISO(apt.date));
+  const canCancel = (apt: AppointmentResponse) => apt.status === 'CONFIRMED';
+  const canComplete = (apt: AppointmentResponse) => apt.status === 'CONFIRMED' && isPast(parseISO(apt.date));
+  const canMarkNoShow = (apt: AppointmentResponse) => apt.status === 'CONFIRMED' && isPast(parseISO(apt.date));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -173,9 +175,9 @@ export const ManageAppointmentsPage = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 <option value="ALL">Todos</option>
-                <option value="PENDING">Pendientes</option>
                 <option value="CONFIRMED">Confirmados</option>
                 <option value="COMPLETED">Completados</option>
+                <option value="NO_SHOW">Ausentes</option>
                 <option value="CANCELLED">Cancelados</option>
               </select>
             </div>
@@ -231,7 +233,7 @@ export const ManageAppointmentsPage = () => {
                         </p>
                         <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
                           <Clock size={14} />
-                          {apt.startTime} - {apt.endTime} ({apt.service?.durationMinutes} min)
+                          {apt.startTime} - {apt.endTime} ({apt.serviceDuration} min)
                         </p>
                       </div>
                     </div>
@@ -241,9 +243,9 @@ export const ManageAppointmentsPage = () => {
                       <User className="text-primary mt-1 flex-shrink-0" size={20} />
                       <div>
                         <p className="font-medium text-gray-800">
-                          {apt.client?.firstName} {apt.client?.lastName}
+                          {apt.clientName}
                         </p>
-                        <p className="text-sm text-gray-600">{apt.client?.email}</p>
+                        <p className="text-sm text-gray-600">{apt.clientEmail}</p>
                       </div>
                     </div>
 
@@ -251,15 +253,7 @@ export const ManageAppointmentsPage = () => {
                     <div className="flex items-start gap-3">
                       <FileText className="text-primary mt-1 flex-shrink-0" size={20} />
                       <div>
-                        <p className="font-medium text-gray-800">{apt.service?.name}</p>
-                        <p className="text-sm text-gray-600">
-                          ${apt.service?.price.toLocaleString('es-AR')}
-                          {apt.service?.requiresDeposit && (
-                            <span className="ml-2 text-yellow-600">
-                              (Seña: {apt.service.depositPercentage}%)
-                            </span>
-                          )}
-                        </p>
+                        <p className="font-medium text-gray-800">{apt.serviceName}</p>
                       </div>
                     </div>
 
@@ -283,25 +277,25 @@ export const ManageAppointmentsPage = () => {
 
                     {/* Action Buttons */}
                     <div className="flex flex-col gap-2">
-                      {canConfirm(apt) && (
-                        <Button
-                          variant="primary"
-                          onClick={() => handleUpdateStatus(apt.id, 'CONFIRMED')}
-                          className="text-sm"
-                        >
-                          <CheckCircle size={16} className="inline mr-1" />
-                          Confirmar
-                        </Button>
-                      )}
-
                       {canComplete(apt) && (
                         <Button
-                          variant="secondary"
+                          variant="primary"
                           onClick={() => handleUpdateStatus(apt.id, 'COMPLETED')}
                           className="text-sm"
                         >
                           <CheckCircle size={16} className="inline mr-1" />
                           Completar
+                        </Button>
+                      )}
+
+                      {canMarkNoShow(apt) && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => handleUpdateStatus(apt.id, 'NO_SHOW')}
+                          className="text-sm"
+                        >
+                          <AlertCircle size={16} className="inline mr-1" />
+                          No Asistió
                         </Button>
                       )}
 
@@ -347,13 +341,10 @@ export const ManageAppointmentsPage = () => {
                     <span className="font-medium">Horario:</span> {selectedAppointment.startTime} - {selectedAppointment.endTime}
                   </p>
                   <p>
-                    <span className="font-medium">Servicio:</span> {selectedAppointment.service?.name}
+                    <span className="font-medium">Servicio:</span> {selectedAppointment.serviceName}
                   </p>
                   <p>
-                    <span className="font-medium">Duración:</span> {selectedAppointment.service?.durationMinutes} minutos
-                  </p>
-                  <p>
-                    <span className="font-medium">Precio:</span> ${selectedAppointment.service?.price.toLocaleString('es-AR')}
+                    <span className="font-medium">Duración:</span> {selectedAppointment.serviceDuration} minutos
                   </p>
                   <p>
                     <span className="font-medium">Estado:</span>{' '}
@@ -370,19 +361,11 @@ export const ManageAppointmentsPage = () => {
                 <div className="space-y-2 text-sm">
                   <p className="flex items-center gap-2">
                     <User size={16} className="text-primary" />
-                    <span className="font-medium">Nombre:</span> {selectedAppointment.client?.firstName} {selectedAppointment.client?.lastName}
+                    <span className="font-medium">Nombre:</span> {selectedAppointment.clientName}
                   </p>
                   <p className="flex items-center gap-2">
                     <Mail size={16} className="text-primary" />
-                    <span className="font-medium">Email:</span> {selectedAppointment.client?.email}
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <Phone size={16} className="text-primary" />
-                    <span className="font-medium">Teléfono:</span> {selectedAppointment.client?.phone}
-                  </p>
-                  <p>
-                    <span className="font-medium">Fecha de nacimiento:</span>{' '}
-                    {selectedAppointment.client?.birthDate && format(parseISO(selectedAppointment.client.birthDate), "d 'de' MMMM, yyyy", { locale: es })}
+                    <span className="font-medium">Email:</span> {selectedAppointment.clientEmail}
                   </p>
                 </div>
               </div>
@@ -397,7 +380,7 @@ export const ManageAppointmentsPage = () => {
 
               {/* Metadata */}
               <div className="text-xs text-gray-500 pt-2 border-t border-gray-200">
-                <p>Turno creado: {format(parseISO(selectedAppointment.createdAt), "d/MM/yyyy 'a las' HH:mm", { locale: es })}</p>
+                <p>Turno creado: {format(new Date(selectedAppointment.createdAt), "d/MM/yyyy 'a las' HH:mm", { locale: es })}</p>
               </div>
             </div>
           </Modal>

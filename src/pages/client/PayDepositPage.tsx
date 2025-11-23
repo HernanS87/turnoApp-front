@@ -1,104 +1,123 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { SERVICES } from '../../data/services';
-import { PROFESSIONAL } from '../../data/professional';
-import { createAppointment } from '../../utils/appointmentStorage';
-import { calculateEndTime } from '../../utils/availabilityUtils';
+import { AuthModal } from '../../components/auth/AuthModal';
+import serviceService from '../../services/serviceService';
+import appointmentService from '../../services/appointmentService';
+import { getErrorMessage } from '../../utils/errorHandler';
+import type { ServiceResponse } from '../../types/api';
 import { ArrowLeft, CreditCard, AlertCircle, CheckCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'react-toastify';
 
-interface PendingAppointment {
-  serviceId: number;
-  date: string;
-  time: string;
-}
+// Helper function to calculate end time
+const calculateEndTime = (startTime: string, durationMinutes: number): string => {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const totalMinutes = hours * 60 + minutes + durationMinutes;
+  const endHours = Math.floor(totalMinutes / 60) % 24;
+  const endMinutes = totalMinutes % 60;
+  return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+};
 
 export const PayDepositPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [pendingAppointment, setPendingAppointment] = useState<PendingAppointment | null>(null);
-  const [service, setService] = useState<any>(null);
+  const [searchParams] = useSearchParams();
+
+  const [service, setService] = useState<ServiceResponse | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Extract params
+  const serviceId = searchParams.get('serviceId');
+  const date = searchParams.get('date');
+  const time = searchParams.get('time');
 
   useEffect(() => {
-    // Check if user is authenticated
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    // Load pending appointment
-    const pending = sessionStorage.getItem('pendingAppointment');
-    if (!pending) {
-      navigate('/');
-      return;
-    }
-
-    try {
-      const data = JSON.parse(pending);
-      setPendingAppointment(data);
-
-      const svc = SERVICES.find(s => s.id === data.serviceId);
-      if (!svc || !svc.requiresDeposit) {
-        // Service doesn't require deposit, shouldn't be here
+    const loadData = async () => {
+      // Validate params
+      if (!serviceId || !date || !time) {
+        toast.error('Datos incompletos');
         navigate('/');
         return;
       }
 
-      setService(svc);
-    } catch (error) {
-      console.error('Error parsing pending appointment:', error);
-      navigate('/');
-    }
-  }, [user, navigate]);
+      // Check authentication
+      if (!user) {
+        setShowAuthModal(true);
+        setLoading(false);
+        return;
+      }
 
-  const handlePayment = () => {
-    if (!pendingAppointment || !service || !user) return;
+      // Validate role
+      if (user.role !== 'CLIENT') {
+        toast.error('Solo los clientes pueden agendar turnos');
+        navigate('/');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const serviceData = await serviceService.getServiceById(parseInt(serviceId));
+
+        // Validate service requires deposit
+        if (serviceData.depositPercentage === 0) {
+          toast.error('Este servicio no requiere seña');
+          navigate('/');
+          return;
+        }
+
+        setService(serviceData);
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Error al cargar el servicio'));
+        navigate('/');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user, serviceId, date, time, navigate]);
+
+  const handlePayment = async () => {
+    if (!service || !user || !date || !time) return;
 
     setProcessing(true);
 
-    // Simulate payment processing
-    setTimeout(() => {
+    // Simulate payment processing (2 seconds)
+    setTimeout(async () => {
       try {
-        // Create appointment with PENDING status
-        const newAppointment = createAppointment({
-          professionalId: PROFESSIONAL.id,
-          clientId: user.clientId!,
+        await appointmentService.createAppointment({
           serviceId: service.id,
-          date: pendingAppointment.date,
-          startTime: pendingAppointment.time,
-          endTime: calculateEndTime(pendingAppointment.time, service.durationMinutes),
-          status: 'PENDING',
+          date,
+          startTime: time,
           notes: ''
         });
 
-        // Clear pending appointment
-        sessionStorage.removeItem('pendingAppointment');
-
-        // Show success message
-        toast.success('¡Pago confirmado! Tu turno está pendiente de aprobación por el profesional.');
-
-        // Redirect to dashboard
+        toast.success('¡Pago confirmado! Tu turno ha sido agendado exitosamente.');
         navigate('/client/dashboard');
       } catch (error) {
-        console.error('Error creating appointment:', error);
-        toast.error('Error al procesar el pago. Por favor intentá nuevamente.');
+        toast.error(getErrorMessage(error, 'Error al procesar el pago'));
         setProcessing(false);
       }
-    }, 2000); // Simulate 2s payment processing
+    }, 2000);
   };
 
   const handleCancel = () => {
-    sessionStorage.removeItem('pendingAppointment');
     navigate(-1);
   };
 
-  if (!pendingAppointment || !service) {
+  const handleAuthSuccess = async () => {
+    setShowAuthModal(false);
+    // Reload data after auth
+    window.location.reload();
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -107,6 +126,10 @@ export const PayDepositPage = () => {
         </div>
       </div>
     );
+  }
+
+  if (!service || !date || !time) {
+    return null;
   }
 
   const depositAmount = service.price * (service.depositPercentage / 100);
@@ -149,24 +172,18 @@ export const PayDepositPage = () => {
             <div className="flex justify-between">
               <span className="text-gray-600">Fecha:</span>
               <span className="font-medium text-gray-800">
-                {format(parseISO(pendingAppointment.date), "EEEE dd 'de' MMMM 'de' yyyy", { locale: es })}
+                {format(parseISO(date), "EEEE dd 'de' MMMM 'de' yyyy", { locale: es })}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Hora:</span>
               <span className="font-medium text-gray-800">
-                {pendingAppointment.time} - {calculateEndTime(pendingAppointment.time, service.durationMinutes)}
+                {time} - {calculateEndTime(time, service.duration)}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Duración:</span>
-              <span className="font-medium text-gray-800">{service.durationMinutes} minutos</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Profesional:</span>
-              <span className="font-medium text-gray-800">
-                {PROFESSIONAL.firstName} {PROFESSIONAL.lastName}
-              </span>
+              <span className="font-medium text-gray-800">{service.duration} minutos</span>
             </div>
           </div>
 
@@ -194,9 +211,8 @@ export const PayDepositPage = () => {
               <h3 className="font-bold text-blue-900 mb-2">Información importante</h3>
               <ul className="text-sm text-blue-800 space-y-1">
                 <li>• El pago de la seña confirma tu turno</li>
-                <li>• El profesional revisará y confirmará tu solicitud</li>
                 <li>• El resto del pago se abona en el consultorio</li>
-                <li>• Recibirás una notificación cuando tu turno sea confirmado</li>
+                <li>• Podés cancelar tu turno desde el panel de cliente</li>
               </ul>
             </div>
           </div>
@@ -224,7 +240,7 @@ export const PayDepositPage = () => {
         {/* Payment Button */}
         <Card className="bg-white">
           <div className="text-center mb-4">
-            <p className="text-sm text-gray-500 mb-2">Modo demo - v0.1</p>
+            <p className="text-sm text-gray-500 mb-2">Modo demo - MVP</p>
             <p className="text-xs text-gray-400">
               En producción se integrará con MercadoPago
             </p>
@@ -259,6 +275,13 @@ export const PayDepositPage = () => {
           </Button>
         </Card>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => navigate('/')}
+        onSuccess={handleAuthSuccess}
+      />
     </div>
   );
 };

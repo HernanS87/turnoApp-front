@@ -6,47 +6,98 @@ import { Button } from '../../components/common/Button';
 import { DateSelector } from '../../components/client/DateSelector';
 import { TimeSlotSelector } from '../../components/client/TimeSlotSelector';
 import { AuthModal } from '../../components/auth/AuthModal';
-import { SERVICES } from '../../data/services';
-import { PROFESSIONAL } from '../../data/professional';
-import { getAvailableDates, getAvailableSlots, calculateEndTime } from '../../utils/availabilityUtils';
-import { createAppointment } from '../../utils/appointmentStorage';
-import { ArrowLeft, Clock, DollarSign, MapPin } from 'lucide-react';
-import { format } from 'date-fns';
+import serviceService from '../../services/serviceService';
+import appointmentService from '../../services/appointmentService';
+import { getErrorMessage } from '../../utils/errorHandler';
+import type { ServiceResponse, DateAvailability } from '../../types/api';
+import { ArrowLeft, Clock, DollarSign } from 'lucide-react';
+import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'react-toastify';
 
+// Helper function to calculate end time
+const calculateEndTime = (startTime: string, durationMinutes: number): string => {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const totalMinutes = hours * 60 + minutes + durationMinutes;
+  const endHours = Math.floor(totalMinutes / 60) % 24;
+  const endMinutes = totalMinutes % 60;
+  return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+};
+
 export const BookAppointmentPage = () => {
-  const { serviceId } = useParams<{ serviceId: string }>();
+  const { customUrl, serviceId } = useParams<{ customUrl: string; serviceId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [service, setService] = useState(SERVICES.find(s => s.id === parseInt(serviceId || '0')));
-  const [availableDates, setAvailableDates] = useState<Date[]>([]);
+  const [service, setService] = useState<ServiceResponse | null>(null);
+  const [availability, setAvailability] = useState<DateAvailability[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Load available dates on mount
+  // Load service and availability from API
   useEffect(() => {
-    if (!service) {
-      navigate('/');
-      return;
-    }
+    const loadServiceAndAvailability = async () => {
+      if (!customUrl || !serviceId) {
+        navigate('/');
+        return;
+      }
 
-    setLoading(true);
-    const dates = getAvailableDates(service, 14);
-    setAvailableDates(dates);
-    setLoading(false);
-  }, [service, navigate]);
+      setLoading(true);
+      try {
+        // Load service using public endpoint
+        const serviceData = await serviceService.getPublicServiceByCustomUrlAndId(customUrl, parseInt(serviceId));
+        setService(serviceData);
+
+        // Load availability
+        const today = new Date();
+        const endDate = addDays(today, 30);
+
+        const response = await appointmentService.getAvailabilityByDates(
+          serviceData.professionalId,
+          serviceData.id,
+          format(today, 'yyyy-MM-dd'),
+          format(endDate, 'yyyy-MM-dd')
+        );
+
+        setAvailability(response.availability);
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Error al cargar información'));
+        navigate('/');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadServiceAndAvailability();
+  }, [customUrl, serviceId, navigate]);
 
   // Load available slots when date changes
   useEffect(() => {
     if (selectedDate && service) {
-      const slots = getAvailableSlots(selectedDate, service);
-      setAvailableSlots(slots);
-      setSelectedTime(null); // Reset time selection
+      const loadSlots = async () => {
+        try {
+          const response = await appointmentService.getAvailableSlots(
+            service.professionalId,
+            service.id,
+            format(selectedDate, 'yyyy-MM-dd')
+          );
+
+          const available = response.slots
+            .filter(slot => slot.available)
+            .map(slot => slot.startTime);
+
+          setAvailableSlots(available);
+          setSelectedTime(null);
+        } catch (error) {
+          toast.error(getErrorMessage(error, 'Error al cargar horarios'));
+          setAvailableSlots([]);
+        }
+      };
+
+      loadSlots();
     }
   }, [selectedDate, service]);
 
@@ -54,13 +105,6 @@ export const BookAppointmentPage = () => {
     if (!selectedDate || !selectedTime) {
       return;
     }
-
-    // Save pending appointment to sessionStorage
-    sessionStorage.setItem('pendingAppointment', JSON.stringify({
-      serviceId: service?.id,
-      date: format(selectedDate, 'yyyy-MM-dd'),
-      time: selectedTime
-    }));
 
     // If not authenticated, show auth modal
     if (!user) {
@@ -72,34 +116,35 @@ export const BookAppointmentPage = () => {
     proceedToNextStep();
   };
 
-  const proceedToNextStep = () => {
-    if (service?.requiresDeposit) {
-      // Requires deposit → Go to payment page
-      navigate('/pay-deposit');
-    } else {
-      // No deposit required → Create appointment immediately and go to dashboard
-      if (!user?.clientId || !selectedDate || !selectedTime || !service) {
-        toast.error('Error al crear el turno');
-        return;
-      }
+  const proceedToNextStep = async () => {
+    if (!selectedDate || !selectedTime || !service) {
+      toast.error('Error al crear el turno');
+      return;
+    }
 
-      const endTime = calculateEndTime(selectedTime, service.durationMinutes);
-      createAppointment({
-        professionalId: PROFESSIONAL.id,
-        clientId: user.clientId,
-        serviceId: service.id,
+    if (service.depositPercentage > 0) {
+      // Requires deposit → Go to payment page with query params
+      const params = new URLSearchParams({
+        serviceId: service.id.toString(),
         date: format(selectedDate, 'yyyy-MM-dd'),
-        startTime: selectedTime,
-        endTime,
-        status: 'CONFIRMED',
-        notes: ''
+        time: selectedTime
       });
+      navigate(`/pay-deposit?${params.toString()}`);
+    } else {
+      // No deposit required → Create appointment immediately via API
+      try {
+        await appointmentService.createAppointment({
+          serviceId: service.id,
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          startTime: selectedTime,
+          notes: ''
+        });
 
-      // Clear pending appointment from sessionStorage
-      sessionStorage.removeItem('pendingAppointment');
-
-      toast.success('¡Turno agendado exitosamente!');
-      navigate('/client/dashboard');
+        toast.success('¡Turno agendado exitosamente!');
+        navigate('/client/dashboard');
+      } catch (error) {
+        toast.error(getErrorMessage(error, 'Error al agendar el turno'));
+      }
     }
   };
 
@@ -141,13 +186,7 @@ export const BookAppointmentPage = () => {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Professional Header */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4">
-            {PROFESSIONAL.firstName[0]}{PROFESSIONAL.lastName[0]}
-          </div>
-          <h1 className="text-3xl font-bold text-gray-800">
-            {PROFESSIONAL.firstName} {PROFESSIONAL.lastName}
-          </h1>
-          <p className="text-gray-600">{PROFESSIONAL.profession}</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Agendar Turno</h1>
         </div>
 
         <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
@@ -163,10 +202,10 @@ export const BookAppointmentPage = () => {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-4 text-sm">
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div className="flex items-center gap-2 text-gray-700">
               <Clock size={18} className="text-primary" />
-              <span>{service.durationMinutes} minutos</span>
+              <span>{service.duration} minutos</span>
             </div>
             <div className="flex items-center gap-2 text-gray-700">
               <DollarSign size={18} className="text-primary" />
@@ -174,13 +213,9 @@ export const BookAppointmentPage = () => {
                 {service.price === 0 ? 'Gratis' : `$${service.price.toLocaleString()}`}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <MapPin size={18} className="text-primary" />
-              <span>{PROFESSIONAL.siteConfig.city}</span>
-            </div>
           </div>
 
-          {service.requiresDeposit && (
+          {service.depositPercentage > 0 && (
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
                 ⚠️ Requiere seña del {service.depositPercentage}%
@@ -193,7 +228,7 @@ export const BookAppointmentPage = () => {
         {/* Date Selection */}
         <Card className="mb-6">
           <DateSelector
-            availableDates={availableDates}
+            availability={availability}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
           />
@@ -229,16 +264,12 @@ export const BookAppointmentPage = () => {
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Horario:</span>
                 <span className="font-medium text-gray-800">
-                  {selectedTime} - {calculateEndTime(selectedTime, service.durationMinutes)}
+                  {selectedTime} - {calculateEndTime(selectedTime, service.duration)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Duración:</span>
-                <span className="font-medium text-gray-800">{service.durationMinutes} minutos</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Dirección:</span>
-                <span className="font-medium text-gray-800">{PROFESSIONAL.siteConfig.address}</span>
+                <span className="font-medium text-gray-800">{service.duration} minutos</span>
               </div>
             </div>
 

@@ -33,6 +33,7 @@ export const PayDepositPage = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Extract params
+  const customUrl = searchParams.get('customUrl');
   const serviceId = searchParams.get('serviceId');
   const date = searchParams.get('date');
   const time = searchParams.get('time');
@@ -40,7 +41,7 @@ export const PayDepositPage = () => {
   useEffect(() => {
     const loadData = async () => {
       // Validate params
-      if (!serviceId || !date || !time) {
+      if (!customUrl || !serviceId || !date || !time) {
         toast.error('Datos incompletos');
         navigate('/');
         return;
@@ -62,7 +63,7 @@ export const PayDepositPage = () => {
 
       setLoading(true);
       try {
-        const serviceData = await serviceService.getServiceById(parseInt(serviceId));
+        const serviceData = await serviceService.getPublicServiceByCustomUrlAndId(customUrl, parseInt(serviceId));
 
         // Validate service requires deposit
         if (serviceData.depositPercentage === 0) {
@@ -81,7 +82,7 @@ export const PayDepositPage = () => {
     };
 
     loadData();
-  }, [user, serviceId, date, time, navigate]);
+  }, [user, customUrl, serviceId, date, time, navigate]);
 
   const handlePayment = async () => {
     if (!service || !user || !date || !time) return;

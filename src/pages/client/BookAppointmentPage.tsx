@@ -117,7 +117,7 @@ export const BookAppointmentPage = () => {
   };
 
   const proceedToNextStep = async () => {
-    if (!selectedDate || !selectedTime || !service) {
+    if (!selectedDate || !selectedTime || !service || !customUrl) {
       toast.error('Error al crear el turno');
       return;
     }
@@ -125,6 +125,7 @@ export const BookAppointmentPage = () => {
     if (service.depositPercentage > 0) {
       // Requires deposit → Go to payment page with query params
       const params = new URLSearchParams({
+        customUrl,
         serviceId: service.id.toString(),
         date: format(selectedDate, 'yyyy-MM-dd'),
         time: selectedTime

@@ -15,6 +15,7 @@ export interface User {
 
 export interface Professional {
   id: number;
+  userId?: number;
   firstName: string;
   lastName: string;
   profession: string;
@@ -22,8 +23,8 @@ export interface Professional {
   phone: string;
   customUrl: string;
   status: Status;
-  registrationDate: string;
-  siteConfig: SiteConfig;
+  registrationDate?: string;
+  siteConfig?: SiteConfig;
 }
 
 export interface SiteConfig {

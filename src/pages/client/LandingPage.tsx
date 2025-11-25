@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/common/Card';
-import { Button } from '../../components/common/Button';
 import serviceService from '../../services/serviceService';
 import { getErrorMessage } from '../../utils/errorHandler';
 import { Clock, MapPin, Phone, Mail, Instagram, Facebook, Linkedin } from 'lucide-react';
@@ -13,18 +12,44 @@ interface LandingPageProps {
   professional: Professional;
 }
 
-const getStorageKey = (professionalId: number) => `siteConfig_${professionalId}`;
-
 export const LandingPage = ({ professional }: LandingPageProps) => {
   const navigate = useNavigate();
   const [services, setServices] = useState<ServiceResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load custom config from localStorage or use default
-  const siteConfig: SiteConfig = (() => {
-    const stored = localStorage.getItem(getStorageKey(professional.id));
-    return stored ? JSON.parse(stored) : professional.siteConfig;
-  })();
+  // Use siteConfig from professional (loaded from backend)
+  // Merge with defaults to ensure all fields are present
+  const defaultConfig: SiteConfig = {
+    logoUrl: "/assets/logo-default.png",
+    primaryColor: "#6366f1",
+    secondaryColor: "#8b5cf6",
+    professionalDescription: "",
+    address: "",
+    city: "",
+    province: "",
+    country: "Argentina",
+    businessHours: "",
+    welcomeMessage: "Bienvenido",
+    socialMedia: {}
+  };
+
+  const siteConfig: SiteConfig = professional.siteConfig ? {
+    ...defaultConfig,
+    logoUrl: professional.siteConfig.logoUrl || defaultConfig.logoUrl,
+    primaryColor: professional.siteConfig.primaryColor || defaultConfig.primaryColor,
+    secondaryColor: professional.siteConfig.secondaryColor || defaultConfig.secondaryColor,
+    professionalDescription: professional.siteConfig.professionalDescription || '',
+    address: professional.siteConfig.address || '',
+    city: professional.siteConfig.city || '',
+    province: professional.siteConfig.province || '',
+    country: professional.siteConfig.country || defaultConfig.country,
+    businessHours: professional.siteConfig.businessHours || '',
+    welcomeMessage: professional.siteConfig.welcomeMessage || defaultConfig.welcomeMessage,
+    socialMedia: {
+      ...defaultConfig.socialMedia,
+      ...(professional.siteConfig.socialMedia || {})
+    }
+  } : defaultConfig;
 
   // Load services from API on mount
   useEffect(() => {
@@ -56,13 +81,6 @@ export const LandingPage = ({ professional }: LandingPageProps) => {
       >
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
-            {siteConfig.logoUrl && siteConfig.logoUrl !== '/assets/logo-default.png' && (
-              <img
-                src={siteConfig.logoUrl}
-                alt="Logo"
-                className="w-32 h-32 mx-auto mb-6 object-contain bg-white rounded-lg p-3 shadow-lg"
-              />
-            )}
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               {professional.firstName} {professional.lastName}
             </h1>
@@ -78,7 +96,7 @@ export const LandingPage = ({ professional }: LandingPageProps) => {
           <Card className="mb-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Sobre mí</h2>
             <p className="text-gray-600 leading-relaxed mb-6">
-              {siteConfig.professionalDescription}
+              {siteConfig.professionalDescription || 'Sin descripción disponible.'}
             </p>
 
             <div className="grid md:grid-cols-2 gap-4 text-gray-700">
@@ -86,8 +104,17 @@ export const LandingPage = ({ professional }: LandingPageProps) => {
                 <MapPin className="mt-1 flex-shrink-0" size={20} style={{ color: siteConfig.primaryColor }} />
                 <div>
                   <p className="font-medium">Dirección</p>
-                  <p className="text-sm">{siteConfig.address}</p>
-                  <p className="text-sm">{siteConfig.city}, {siteConfig.province}</p>
+                  {siteConfig.address && (
+                    <p className="text-sm">{siteConfig.address}</p>
+                  )}
+                  {(siteConfig.city || siteConfig.province) && (
+                    <p className="text-sm">
+                      {[siteConfig.city, siteConfig.province].filter(Boolean).join(', ')}
+                    </p>
+                  )}
+                  {!siteConfig.address && !siteConfig.city && !siteConfig.province && (
+                    <p className="text-sm text-gray-400">No especificada</p>
+                  )}
                 </div>
               </div>
 
@@ -95,7 +122,7 @@ export const LandingPage = ({ professional }: LandingPageProps) => {
                 <Clock className="mt-1 flex-shrink-0" size={20} style={{ color: siteConfig.primaryColor }} />
                 <div>
                   <p className="font-medium">Horario de atención</p>
-                  <p className="text-sm">{siteConfig.businessHours}</p>
+                  <p className="text-sm">{siteConfig.businessHours || 'No especificado'}</p>
                 </div>
               </div>
 

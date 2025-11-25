@@ -19,22 +19,38 @@ export const ClientDashboardPage = () => {
   const [loading, setLoading] = useState(true);
 
   // Load client appointments from API
-  useEffect(() => {
-    const loadAppointments = async () => {
-      setLoading(true);
-      try {
-        const data = await appointmentService.getClientAppointments();
-        setAppointments(data);
-      } catch (error) {
-        toast.error(getErrorMessage(error, 'Error al cargar turnos'));
-        setAppointments([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadAppointments = async () => {
+    setLoading(true);
+    try {
+      const data = await appointmentService.getClientAppointments();
+      setAppointments(data);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Error al cargar turnos'));
+      setAppointments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadAppointments();
   }, []);
+
+  // Handle cancel appointment
+  const handleCancelAppointment = async (appointmentId: number) => {
+    if (!window.confirm('¿Estás seguro de que deseas cancelar este turno?')) {
+      return;
+    }
+
+    try {
+      await appointmentService.updateAppointmentStatus(appointmentId, 'CANCELLED');
+      toast.success('Turno cancelado exitosamente');
+      // Reload appointments to reflect the change
+      await loadAppointments();
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Error al cancelar el turno'));
+    }
+  };
 
   // Get future appointments
   const futureAppointments = appointments
@@ -221,7 +237,11 @@ export const ClientDashboardPage = () => {
                         {getStatusLabel(apt.status)}
                       </span>
                       {apt.status === 'CONFIRMED' && (
-                        <Button variant="danger" className="text-sm">
+                        <Button 
+                          variant="danger" 
+                          className="text-sm"
+                          onClick={() => handleCancelAppointment(apt.id)}
+                        >
                           Cancelar
                         </Button>
                       )}

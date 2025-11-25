@@ -1,69 +1,105 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { getProfessionalById } from '../../data/professional';
-import { useAuth } from '../../hooks/useAuth';
-import { Palette, Image as ImageIcon, FileText, Save, RotateCcw, Eye } from 'lucide-react';
+import { professionalService } from '../../services/professionalService';
+import { Palette, FileText, Save, Eye } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { SiteConfig } from '../../types';
+import { SiteConfig, Professional } from '../../types';
 
-const getStorageKey = (professionalId: number) => `siteConfig_${professionalId}`;
+const defaultConfig: SiteConfig = {
+  logoUrl: "",
+  primaryColor: "#6366f1",
+  secondaryColor: "#8b5cf6",
+  professionalDescription: "",
+  address: "",
+  city: "",
+  province: "",
+  country: "Argentina",
+  businessHours: "",
+  welcomeMessage: "Bienvenido",
+  socialMedia: {}
+};
 
 export const CustomizationPage = () => {
-  const { user } = useAuth();
-  const professionalId = user?.professionalId || 1;
-  const professional = getProfessionalById(professionalId);
-
-  const [config, setConfig] = useState<SiteConfig>(() => {
-    const stored = localStorage.getItem(getStorageKey(professionalId));
-    return stored ? JSON.parse(stored) : (professional?.siteConfig || {
-      logoUrl: "/assets/logo-default.png",
-      primaryColor: "#6366f1",
-      secondaryColor: "#8b5cf6",
-      professionalDescription: "",
-      address: "",
-      city: "",
-      province: "",
-      country: "Argentina",
-      businessHours: "",
-      welcomeMessage: "Bienvenido",
-      socialMedia: {}
-    });
-  });
-
+  const [loading, setLoading] = useState(false);
+  const [professional, setProfessional] = useState<Professional | null>(null);
+  const [config, setConfig] = useState<SiteConfig>(defaultConfig);
   const [previewMode, setPreviewMode] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string>(config.logoUrl);
 
-  const handleSave = () => {
-    localStorage.setItem(getStorageKey(professionalId), JSON.stringify(config));
-    toast.success('Configuración guardada exitosamente');
-  };
+  // Cargar configuración al montar
+  useEffect(() => {
+    loadSiteConfig();
+  }, []);
 
-  const handleReset = () => {
-    if (window.confirm('¿Estás seguro de restaurar la configuración por defecto?')) {
-      const defaultConfig = professional?.siteConfig || config;
+  const loadSiteConfig = async () => {
+    try {
+      setLoading(true);
+      const prof = await professionalService.getMyProfile();
+      setProfessional(prof);
+      if (prof.siteConfig) {
+        // Merge con valores por defecto para asegurar que todos los campos estén presentes
+        // Convertir null/undefined a strings vacíos o valores por defecto
+        const mergedConfig: SiteConfig = {
+          ...defaultConfig,
+          logoUrl: prof.siteConfig.logoUrl || '',
+          primaryColor: prof.siteConfig.primaryColor || defaultConfig.primaryColor,
+          secondaryColor: prof.siteConfig.secondaryColor || defaultConfig.secondaryColor,
+          professionalDescription: prof.siteConfig.professionalDescription || '',
+          address: prof.siteConfig.address || '',
+          city: prof.siteConfig.city || '',
+          province: prof.siteConfig.province || '',
+          country: prof.siteConfig.country || defaultConfig.country,
+          businessHours: prof.siteConfig.businessHours || '',
+          welcomeMessage: prof.siteConfig.welcomeMessage || defaultConfig.welcomeMessage,
+          socialMedia: {
+            ...defaultConfig.socialMedia,
+            ...(prof.siteConfig.socialMedia || {})
+          }
+        };
+        setConfig(mergedConfig);
+      } else {
+        setConfig(defaultConfig);
+      }
+    } catch (error) {
+      console.error('Error loading site config:', error);
+      toast.error('Error al cargar la configuración');
+      // Usar valores por defecto en caso de error
       setConfig(defaultConfig);
-      setLogoPreview(defaultConfig.logoUrl);
-      localStorage.setItem(getStorageKey(professionalId), JSON.stringify(defaultConfig));
-      toast.success('Configuración restaurada');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Simulate upload with FileReader for preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setLogoPreview(result);
-        setConfig({ ...config, logoUrl: result });
-        toast.info('Logo cargado (simulación - guardar para aplicar)');
-      };
-      reader.readAsDataURL(file);
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      const updatedProfessional = await professionalService.updateSiteConfig({
+        logoUrl: config.logoUrl,
+        primaryColor: config.primaryColor,
+        secondaryColor: config.secondaryColor,
+        professionalDescription: config.professionalDescription,
+        address: config.address,
+        city: config.city,
+        province: config.province,
+        country: config.country,
+        businessHours: config.businessHours,
+        welcomeMessage: config.welcomeMessage,
+        socialMedia: config.socialMedia
+      });
+      setProfessional(updatedProfessional);
+      if (updatedProfessional.siteConfig) {
+        setConfig(updatedProfessional.siteConfig);
+      }
+      toast.success('Configuración guardada exitosamente');
+    } catch (error) {
+      console.error('Error saving site config:', error);
+      toast.error('Error al guardar la configuración');
+    } finally {
+      setLoading(false);
     }
   };
+
 
   const handleColorChange = (field: 'primaryColor' | 'secondaryColor', value: string) => {
     setConfig({ ...config, [field]: value });
@@ -80,17 +116,13 @@ export const CustomizationPage = () => {
               <p className="text-gray-600">Personalizá la apariencia de tu sitio profesional</p>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={handleReset}>
-                <RotateCcw size={16} className="inline mr-2" />
-                Restaurar Defaults
-              </Button>
               <Button variant="outline" onClick={() => setPreviewMode(!previewMode)}>
                 <Eye size={16} className="inline mr-2" />
                 {previewMode ? 'Ocultar' : 'Vista'} Previa
               </Button>
-              <Button variant="primary" onClick={handleSave}>
+              <Button variant="primary" onClick={handleSave} disabled={loading}>
                 <Save size={16} className="inline mr-2" />
-                Guardar Cambios
+                {loading ? 'Guardando...' : 'Guardar Cambios'}
               </Button>
             </div>
           </div>
@@ -99,53 +131,6 @@ export const CustomizationPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Configuration */}
           <div className="space-y-6">
-            {/* Logo */}
-            <Card>
-              <div className="flex items-center gap-2 mb-4">
-                <ImageIcon className="text-primary" size={20} />
-                <h2 className="text-xl font-bold text-gray-800">Logo</h2>
-              </div>
-
-              <div className="space-y-4">
-                {/* Logo Preview */}
-                <div className="flex justify-center p-6 bg-gray-100 rounded-lg">
-                  {logoPreview ? (
-                    <img
-                      src={logoPreview}
-                      alt="Logo preview"
-                      className="max-w-[200px] max-h-[100px] object-contain"
-                    />
-                  ) : (
-                    <div className="text-gray-400 text-center">
-                      <ImageIcon size={48} className="mx-auto mb-2" />
-                      <p className="text-sm">Sin logo</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Upload Button */}
-                <div>
-                  <label className="block">
-                    <span className="sr-only">Seleccionar logo</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="block w-full text-sm text-gray-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-lg file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-primary file:text-white
-                        hover:file:opacity-90 file:cursor-pointer"
-                    />
-                  </label>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Formatos soportados: PNG, JPG, SVG. Tamaño recomendado: 200x100px
-                  </p>
-                </div>
-              </div>
-            </Card>
-
             {/* Colors */}
             <Card>
               <div className="flex items-center gap-2 mb-4">
@@ -162,18 +147,18 @@ export const CustomizationPage = () => {
                   <div className="flex gap-3 items-center">
                     <input
                       type="color"
-                      value={config.primaryColor}
+                      value={config.primaryColor || defaultConfig.primaryColor}
                       onChange={(e) => handleColorChange('primaryColor', e.target.value)}
                       className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
                     />
                     <Input
-                      value={config.primaryColor}
+                      value={config.primaryColor || ''}
                       onChange={(e) => handleColorChange('primaryColor', e.target.value)}
                       placeholder="#6366f1"
                       className="flex-grow"
                     />
                   </div>
-                  <div className="mt-2 p-3 rounded-lg" style={{ backgroundColor: config.primaryColor }}>
+                  <div className="mt-2 p-3 rounded-lg" style={{ backgroundColor: config.primaryColor || defaultConfig.primaryColor }}>
                     <p className="text-white text-sm font-medium text-center">Vista previa</p>
                   </div>
                 </div>
@@ -186,18 +171,18 @@ export const CustomizationPage = () => {
                   <div className="flex gap-3 items-center">
                     <input
                       type="color"
-                      value={config.secondaryColor}
+                      value={config.secondaryColor || defaultConfig.secondaryColor}
                       onChange={(e) => handleColorChange('secondaryColor', e.target.value)}
                       className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
                     />
                     <Input
-                      value={config.secondaryColor}
+                      value={config.secondaryColor || ''}
                       onChange={(e) => handleColorChange('secondaryColor', e.target.value)}
                       placeholder="#8b5cf6"
                       className="flex-grow"
                     />
                   </div>
-                  <div className="mt-2 p-3 rounded-lg" style={{ backgroundColor: config.secondaryColor }}>
+                  <div className="mt-2 p-3 rounded-lg" style={{ backgroundColor: config.secondaryColor || defaultConfig.secondaryColor }}>
                     <p className="text-white text-sm font-medium text-center">Vista previa</p>
                   </div>
                 </div>
@@ -217,8 +202,7 @@ export const CustomizationPage = () => {
                       <button
                         key={preset.name}
                         onClick={() => {
-                          handleColorChange('primaryColor', preset.primary);
-                          handleColorChange('secondaryColor', preset.secondary);
+                          setConfig({ ...config, primaryColor: preset.primary, secondaryColor: preset.secondary });
                         }}
                         className="p-2 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors"
                         title={preset.name}
@@ -249,7 +233,7 @@ export const CustomizationPage = () => {
                     Mensaje de Bienvenida
                   </label>
                   <Input
-                    value={config.welcomeMessage}
+                    value={config.welcomeMessage || ''}
                     onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
                     placeholder="Ej: Bienvenido a mi consultorio virtual"
                   />
@@ -261,14 +245,14 @@ export const CustomizationPage = () => {
                     Descripción Profesional
                   </label>
                   <textarea
-                    value={config.professionalDescription}
+                    value={config.professionalDescription || ''}
                     onChange={(e) => setConfig({ ...config, professionalDescription: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     rows={4}
                     placeholder="Describe tu experiencia y especialidad..."
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    {config.professionalDescription.length} caracteres
+                    {(config.professionalDescription || '').length} caracteres
                   </p>
                 </div>
 
@@ -278,9 +262,45 @@ export const CustomizationPage = () => {
                     Dirección
                   </label>
                   <Input
-                    value={config.address}
+                    value={config.address || ''}
                     onChange={(e) => setConfig({ ...config, address: e.target.value })}
                     placeholder="Ej: San Martín 1234, Piso 3"
+                  />
+                </div>
+
+                {/* City */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ciudad
+                  </label>
+                  <Input
+                    value={config.city || ''}
+                    onChange={(e) => setConfig({ ...config, city: e.target.value })}
+                    placeholder="Ej: Godoy Cruz"
+                  />
+                </div>
+
+                {/* Province */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Provincia
+                  </label>
+                  <Input
+                    value={config.province || ''}
+                    onChange={(e) => setConfig({ ...config, province: e.target.value })}
+                    placeholder="Ej: Mendoza"
+                  />
+                </div>
+
+                {/* Country */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    País
+                  </label>
+                  <Input
+                    value={config.country || ''}
+                    onChange={(e) => setConfig({ ...config, country: e.target.value })}
+                    placeholder="Ej: Argentina"
                   />
                 </div>
 
@@ -290,7 +310,7 @@ export const CustomizationPage = () => {
                     Horario de Atención
                   </label>
                   <Input
-                    value={config.businessHours}
+                    value={config.businessHours || ''}
                     onChange={(e) => setConfig({ ...config, businessHours: e.target.value })}
                     placeholder="Ej: Lunes a Viernes 9:00 - 18:00"
                   />
@@ -347,25 +367,16 @@ export const CustomizationPage = () => {
                   <div
                     className="text-white p-6"
                     style={{
-                      background: `linear-gradient(to right, ${config.primaryColor}, ${config.secondaryColor})`
+                      background: `linear-gradient(to right, ${config.primaryColor || defaultConfig.primaryColor}, ${config.secondaryColor || defaultConfig.secondaryColor})`
                     }}
                   >
-                    <div className="flex items-center gap-4 mb-4">
-                      {logoPreview && (
-                        <img
-                          src={logoPreview}
-                          alt="Logo"
-                          className="w-16 h-16 object-contain bg-white rounded-lg p-2"
-                        />
-                      )}
-                      <div>
-                        <h3 className="text-2xl font-bold">
-                          {professional?.firstName} {professional?.lastName}
-                        </h3>
-                        <p className="text-sm opacity-90">{professional?.profession}</p>
-                      </div>
+                    <div className="mb-4">
+                      <h3 className="text-2xl font-bold">
+                        {professional?.firstName} {professional?.lastName}
+                      </h3>
+                      <p className="text-sm opacity-90">{professional?.profession}</p>
                     </div>
-                    <p className="text-lg font-medium">{config.welcomeMessage}</p>
+                    <p className="text-lg font-medium">{config.welcomeMessage || 'Bienvenido'}</p>
                   </div>
 
                   {/* Description */}
@@ -380,11 +391,11 @@ export const CustomizationPage = () => {
                   <div className="p-6 bg-gray-50 space-y-3">
                     <div className="bg-white p-3 rounded-lg border border-gray-200">
                       <p className="text-xs text-gray-500">Dirección</p>
-                      <p className="text-sm font-medium text-gray-800">{config.address}</p>
+                      <p className="text-sm font-medium text-gray-800">{config.address || 'No especificada'}</p>
                     </div>
                     <div className="bg-white p-3 rounded-lg border border-gray-200">
                       <p className="text-xs text-gray-500">Horario</p>
-                      <p className="text-sm font-medium text-gray-800">{config.businessHours}</p>
+                      <p className="text-sm font-medium text-gray-800">{config.businessHours || 'No especificado'}</p>
                     </div>
                   </div>
 
@@ -398,7 +409,7 @@ export const CustomizationPage = () => {
                         <span className="text-lg font-bold text-primary">$8.000</span>
                         <button
                           className="px-4 py-2 rounded-lg font-medium text-white transition-colors"
-                          style={{ backgroundColor: config.primaryColor }}
+                          style={{ backgroundColor: config.primaryColor || defaultConfig.primaryColor }}
                         >
                           Agendar
                         </button>

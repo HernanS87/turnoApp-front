@@ -1,34 +1,45 @@
 import { Card } from '../../components/common/Card';
-import { getAllAppointments } from '../../utils/appointmentStorage';
-import { getAllClients } from '../../utils/clientStorage';
-import { getAllServices } from '../../utils/serviceStorage';
+import appointmentService from '../../services/appointmentService';
 import { useAuth } from '../../hooks/useAuth';
-import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp } from 'lucide-react';
-import { format, isToday, parseISO, isThisWeek } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Calendar, Clock, CheckCircle, TrendingUp } from 'lucide-react';
+import { isToday, parseISO, isThisWeek } from 'date-fns';
+import { useEffect, useState } from 'react';
+import { AppointmentResponse } from '../../types/api';
+import { toast } from 'react-toastify';
 
 export const DashboardPage = () => {
   const { user } = useAuth();
-  const professionalId = user?.professionalId || 1;
+  const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Get appointments and services for this professional
-  const allAppointments = getAllAppointments();
-  const professionalAppointments = allAppointments.filter(apt => apt.professionalId === professionalId);
-  const services = getAllServices(professionalId);
+  // Load appointments from backend
+  useEffect(() => {
+    const loadAppointments = async () => {
+      try {
+        setLoading(true);
+        const data = await appointmentService.getAppointments();
+        setAppointments(data);
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        toast.error('Error al cargar los turnos');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAppointments();
+  }, []);
 
   // Statistics
-  const todayAppointments = professionalAppointments.filter(apt => isToday(parseISO(apt.date)));
-  const weekAppointments = professionalAppointments.filter(apt => isThisWeek(parseISO(apt.date), { weekStartsOn: 1 }));
-  const pendingAppointments = professionalAppointments.filter(apt => apt.status === 'PENDING');
-  const confirmedAppointments = professionalAppointments.filter(apt => apt.status === 'CONFIRMED');
+  const todayAppointments = appointments.filter(apt => isToday(parseISO(apt.date)));
+  const weekAppointments = appointments.filter(apt => isThisWeek(parseISO(apt.date), { weekStartsOn: 1 }));
+  const confirmedAppointments = appointments.filter(apt => apt.status === 'CONFIRMED');
+  const cancelledAppointments = appointments.filter(apt => apt.status === 'CANCELLED');
+  const completedAppointments = appointments.filter(apt => apt.status === 'COMPLETED');
 
-  // Today's appointments with details
-  const allClients = getAllClients();
-  const todayAppointmentsWithDetails = todayAppointments.map(apt => {
-    const client = allClients.find(c => c.id === apt.clientId);
-    const service = services.find(s => s.id === apt.serviceId);
-    return { ...apt, client, service };
-  }).sort((a, b) => a.startTime.localeCompare(b.startTime));
+  // Today's appointments sorted by time (already includes client and service info from backend)
+  const todayAppointmentsWithDetails = todayAppointments
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -59,6 +70,17 @@ export const DashboardPage = () => {
         return status;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando datos...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -93,10 +115,10 @@ export const DashboardPage = () => {
           <Card className="border-l-4 border-yellow-500">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-600 text-sm mb-1">Pendientes</p>
-                <p className="text-3xl font-bold text-gray-800">{pendingAppointments.length}</p>
+                <p className="text-gray-600 text-sm mb-1">Completados</p>
+                <p className="text-3xl font-bold text-gray-800">{completedAppointments.length}</p>
               </div>
-              <AlertCircle className="text-yellow-500" size={32} />
+              <CheckCircle className="text-yellow-500" size={32} />
             </div>
           </Card>
 
@@ -139,13 +161,13 @@ export const DashboardPage = () => {
                             {apt.startTime} - {apt.endTime}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {apt.client?.firstName} {apt.client?.lastName}
+                            {apt.clientName}
                           </p>
                         </div>
                       </div>
 
                       <div className="ml-8">
-                        <p className="text-sm font-medium text-gray-700">{apt.service?.name}</p>
+                        <p className="text-sm font-medium text-gray-700">{apt.serviceName}</p>
                         {apt.notes && (
                           <p className="text-sm text-gray-500 mt-1">Notas: {apt.notes}</p>
                         )}

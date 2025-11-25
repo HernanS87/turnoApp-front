@@ -10,7 +10,7 @@ import serviceService from '../../services/serviceService';
 import appointmentService from '../../services/appointmentService';
 import { getErrorMessage } from '../../utils/errorHandler';
 import type { ServiceResponse, DateAvailability } from '../../types/api';
-import { ArrowLeft, Clock, DollarSign } from 'lucide-react';
+import { ArrowLeft, Clock, DollarSign, Calendar, CheckCircle2, Timer } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'react-toastify';
@@ -248,39 +248,105 @@ export const BookAppointmentPage = () => {
 
         {/* Summary & Confirm */}
         {selectedDate && selectedTime && (
-          <Card className="bg-primary bg-opacity-5 border-2 border-primary">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Resumen</h3>
+          <Card className="relative overflow-hidden">
+            {/* Decorative gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent pointer-events-none"></div>
+            
+            <div className="relative">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-primary/20">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <CheckCircle2 className="text-primary" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Resumen del Turno</h3>
+                  <p className="text-sm text-gray-500">Revisá los detalles antes de confirmar</p>
+                </div>
+              </div>
 
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Servicio:</span>
-                <span className="font-medium text-gray-800">{service.name}</span>
+              {/* Summary Details */}
+              <div className="space-y-4 mb-6">
+                {/* Service */}
+                <div className="flex items-start gap-4 p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+                  <div className="p-2 rounded-lg bg-blue-100 mt-0.5">
+                    <CheckCircle2 className="text-blue-600" size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Servicio</p>
+                    <p className="text-base font-semibold text-gray-800">{service.name}</p>
+                  </div>
+                </div>
+
+                {/* Date */}
+                <div className="flex items-start gap-4 p-4 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100">
+                  <div className="p-2 rounded-lg bg-purple-100 mt-0.5">
+                    <Calendar className="text-purple-600" size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-purple-600 uppercase tracking-wide mb-1">Fecha</p>
+                    <p className="text-base font-semibold text-gray-800">
+                      {format(selectedDate, "EEEE dd 'de' MMMM", { locale: es })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Time */}
+                <div className="flex items-start gap-4 p-4 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100">
+                  <div className="p-2 rounded-lg bg-green-100 mt-0.5">
+                    <Clock className="text-green-600" size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">Horario</p>
+                    <p className="text-base font-semibold text-gray-800">
+                      {selectedTime} - {calculateEndTime(selectedTime, service.duration)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Duration */}
+                <div className="flex items-start gap-4 p-4 rounded-lg bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100">
+                  <div className="p-2 rounded-lg bg-amber-100 mt-0.5">
+                    <Timer className="text-amber-600" size={20} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-amber-600 uppercase tracking-wide mb-1">Duración</p>
+                    <p className="text-base font-semibold text-gray-800">{service.duration} minutos</p>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Fecha:</span>
-                <span className="font-medium text-gray-800">
-                  {format(selectedDate, "EEEE dd 'de' MMMM", { locale: es })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Horario:</span>
-                <span className="font-medium text-gray-800">
-                  {selectedTime} - {calculateEndTime(selectedTime, service.duration)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Duración:</span>
-                <span className="font-medium text-gray-800">{service.duration} minutos</span>
-              </div>
+
+              {/* Price info if applicable */}
+              {service.price > 0 && (
+                <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="text-gray-600" size={18} />
+                      <span className="text-sm text-gray-600">Precio total:</span>
+                    </div>
+                    <span className="text-xl font-bold text-gray-800">
+                      ${service.price.toLocaleString()}
+                    </span>
+                  </div>
+                  {service.depositPercentage > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-200 flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Seña ({service.depositPercentage}%):</span>
+                      <span className="text-lg font-semibold text-primary">
+                        ${(service.price * (service.depositPercentage / 100)).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Confirm Button */}
+              <Button
+                fullWidth
+                onClick={handleConfirm}
+                className="text-lg py-4 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
+              >
+                Confirmar turno
+              </Button>
             </div>
-
-            <Button
-              fullWidth
-              onClick={handleConfirm}
-              className="text-lg py-3"
-            >
-              Confirmar turno
-            </Button>
           </Card>
         )}
 

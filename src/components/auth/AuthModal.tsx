@@ -32,7 +32,9 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
     firstName: '',
     lastName: '',
     phone: '',
-    birthDate: ''
+    birthDate: '',
+    province: '',
+    city: ''
   });
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -110,17 +112,13 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
   const handleClose = () => {
     setError('');
     setLoginData({ email: '', password: '' });
-    setRegisterData({ email: '', password: '', firstName: '', lastName: '', phone: '', birthDate: '' });
+    setRegisterData({ email: '', password: '', firstName: '', lastName: '', phone: '', birthDate: '', province: '', city: '' });
     onClose();
   };
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="md">
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-800 text-center">
-          Iniciá sesión para continuar
-        </h2>
-
         {/* Tabs */}
         <div className="flex border-b border-gray-200">
           <button
@@ -150,6 +148,10 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
             Crear cuenta
           </button>
         </div>
+
+        <h2 className="text-2xl font-bold text-gray-800 text-center">
+          {activeTab === 'login' ? 'Iniciá sesión para continuar' : 'Creá tu cuenta'}
+        </h2>
 
         {/* Error message */}
         {error && (
@@ -227,6 +229,48 @@ export const AuthModal = ({ isOpen, onClose, onSuccess }: AuthModalProps) => {
               onChange={(e) => setRegisterData({ ...registerData, birthDate: e.target.value })}
               required
             />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block mb-1 text-sm font-medium text-gray-700">Provincia</label>
+                <select
+                  value={registerData.province}
+                  onChange={(e) => setRegisterData({ ...registerData, province: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">Seleccionar provincia</option>
+                  <option value="Buenos Aires">Buenos Aires</option>
+                  <option value="Catamarca">Catamarca</option>
+                  <option value="Chaco">Chaco</option>
+                  <option value="Chubut">Chubut</option>
+                  <option value="Córdoba">Córdoba</option>
+                  <option value="Corrientes">Corrientes</option>
+                  <option value="Entre Ríos">Entre Ríos</option>
+                  <option value="Formosa">Formosa</option>
+                  <option value="Jujuy">Jujuy</option>
+                  <option value="La Pampa">La Pampa</option>
+                  <option value="La Rioja">La Rioja</option>
+                  <option value="Mendoza">Mendoza</option>
+                  <option value="Misiones">Misiones</option>
+                  <option value="Neuquén">Neuquén</option>
+                  <option value="Río Negro">Río Negro</option>
+                  <option value="Salta">Salta</option>
+                  <option value="San Juan">San Juan</option>
+                  <option value="San Luis">San Luis</option>
+                  <option value="Santa Cruz">Santa Cruz</option>
+                  <option value="Santa Fe">Santa Fe</option>
+                  <option value="Santiago del Estero">Santiago del Estero</option>
+                  <option value="Tierra del Fuego">Tierra del Fuego</option>
+                  <option value="Tucumán">Tucumán</option>
+                </select>
+              </div>
+              <Input
+                label="Ciudad"
+                type="text"
+                placeholder="Ciudad"
+                value={registerData.city}
+                onChange={(e) => setRegisterData({ ...registerData, city: e.target.value })}
+              />
+            </div>
             <Input
               label="Contraseña"
               type="password"

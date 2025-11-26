@@ -7,6 +7,7 @@ import { LandingPage } from './pages/client/LandingPage';
 import { ClientDashboardPage } from './pages/client/ClientDashboardPage';
 import { BookAppointmentPage } from './pages/client/BookAppointmentPage';
 import { PayDepositPage } from './pages/client/PayDepositPage';
+import { FindProfessionalsPage } from './pages/client/FindProfessionalsPage';
 import { DashboardPage } from './pages/professional/DashboardPage';
 import { ManageAppointmentsPage } from './pages/professional/ManageAppointmentsPage';
 import { ScheduleConfigPage } from './pages/professional/ScheduleConfigPage';
@@ -151,6 +152,16 @@ const AppRoutes = () => {
       <Route path="/admin/dashboard" element={
         <ProtectedRoute requiredRole="ADMIN">
           <AdminDashboardPage />
+        </ProtectedRoute>
+      } />
+
+      {/* Client Routes - Find Professionals */}
+      <Route path="/find-professionals" element={
+        <ProtectedRoute requiredRole="CLIENT">
+          <>
+            <Navbar />
+            <FindProfessionalsPage />
+          </>
         </ProtectedRoute>
       } />
 

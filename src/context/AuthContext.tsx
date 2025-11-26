@@ -10,6 +10,8 @@ interface RegisterData {
   lastName: string;
   phone: string;
   birthDate: string;
+  province?: string;
+  city?: string;
 }
 
 interface AuthUser {
@@ -19,6 +21,8 @@ interface AuthUser {
   lastName: string;
   role: UserRole;
   professionalId: number | null;
+  province: string | null;
+  city: string | null;
 }
 
 interface AuthContextType {
@@ -50,6 +54,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         lastName: storedUser.lastName,
         role: storedUser.role,
         professionalId: storedUser.professionalId,
+        province: storedUser.province || null,
+        city: storedUser.city || null,
       });
     }
     setLoading(false);
@@ -66,6 +72,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         lastName: response.lastName,
         role: response.role,
         professionalId: response.professionalId,
+        province: response.province || null,
+        city: response.city || null,
       };
 
       authService.saveAuthData(response);
@@ -73,7 +81,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       return { success: true };
     } catch (error: any) {
-      const errorMessage = getErrorMessage(error, 'Credenciales inválidas');
+      const errorMessage = getErrorMessage(error, 'El email o la contraseña son incorrectos');
       return { success: false, error: errorMessage };
     }
   };
@@ -89,6 +97,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         lastName: response.lastName,
         role: response.role,
         professionalId: response.professionalId,
+        province: response.province || null,
+        city: response.city || null,
       };
 
       authService.saveAuthData(response);

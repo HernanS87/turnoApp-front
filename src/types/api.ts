@@ -17,6 +17,8 @@ export interface LoginResponse {
   lastName: string;
   role: UserRole;
   professionalId: number | null;
+  province: string | null;
+  city: string | null;
 }
 
 export interface RegisterRequest {
@@ -26,6 +28,8 @@ export interface RegisterRequest {
   lastName: string;
   phone: string;
   birthDate: string;
+  province?: string;
+  city?: string;
 }
 
 // Professional DTOs
@@ -118,6 +122,8 @@ export interface AppointmentResponse {
   id: number;
   professionalId: number;
   professionalName: string;
+  professionalCustomUrl: string;
+  professionalProfession: string;
   clientId: number;
   clientName: string;
   clientEmail: string;

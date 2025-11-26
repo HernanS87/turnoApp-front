@@ -26,6 +26,8 @@ class AuthService {
       lastName: data.lastName,
       role: data.role,
       professionalId: data.professionalId,
+      province: data.province,
+      city: data.city,
     }));
   }
 

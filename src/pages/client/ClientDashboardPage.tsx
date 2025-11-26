@@ -65,21 +65,53 @@ export const ClientDashboardPage = () => {
 
   // Calculate stats
   const completedCount = appointments.filter(apt => apt.status === 'COMPLETED').length;
-  const lastAppointment = appointments
-    .filter(apt => apt.status === 'COMPLETED')
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
-  // Get unique professionals from appointments
-  const uniqueProfessionals = appointments.reduce((acc, apt) => {
-    if (!acc.find(p => p.id === apt.professionalId)) {
-      acc.push({
+  // Get unique professionals with aggregated information
+  interface ProfessionalInfo {
+    id: number;
+    name: string;
+    customUrl: string;
+    profession: string;
+    lastAppointmentDate: Date;
+    totalAppointments: number;
+    completedAppointments: number;
+  }
+
+  const professionalsMap = new Map<number, ProfessionalInfo>();
+
+  appointments.forEach((apt) => {
+    const existing = professionalsMap.get(apt.professionalId);
+    const aptDate = parseISO(apt.date);
+
+    if (!existing) {
+      // Nuevo profesional
+      professionalsMap.set(apt.professionalId, {
         id: apt.professionalId,
         name: apt.professionalName,
-        customUrl: 'maria-rodriguez' // TODO: Get from backend when available
+        customUrl: apt.professionalCustomUrl,
+        profession: apt.professionalProfession,
+        lastAppointmentDate: aptDate,
+        totalAppointments: 1,
+        completedAppointments: apt.status === 'COMPLETED' ? 1 : 0,
       });
+    } else {
+      // Actualizar información existente
+      if (aptDate > existing.lastAppointmentDate) {
+        existing.lastAppointmentDate = aptDate;
+      }
+      existing.totalAppointments++;
+      if (apt.status === 'COMPLETED') {
+        existing.completedAppointments++;
+      }
     }
-    return acc;
-  }, [] as Array<{ id: number; name: string; customUrl: string }>);
+  });
+
+  // Ordenar por fecha del último turno (más reciente primero) y limitar a 2
+  const allProfessionals = Array.from(professionalsMap.values())
+    .sort((a, b) => b.lastAppointmentDate.getTime() - a.lastAppointmentDate.getTime());
+
+  const recentProfessionals = allProfessionals.slice(0, 2);
+  const hasMoreProfessionals = allProfessionals.length > 2;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -144,15 +176,26 @@ export const ClientDashboardPage = () => {
         </div>
 
         {/* Professionals Section */}
-        {uniqueProfessionals.length > 0 && (
+        {recentProfessionals.length > 0 && (
           <div className="mb-8">
-            <h2 className="flex items-center gap-2 mb-4 text-2xl font-bold text-gray-800">
-              <User className="text-primary" size={28} />
-              Mis Profesionales
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-800">
+                <User className="text-primary" size={28} />
+                Mis Profesionales
+              </h2>
+              {hasMoreProfessionals && (
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate('/find-professionals')}
+                  className="text-sm"
+                >
+                  Ver todos ({allProfessionals.length})
+                </Button>
+              )}
+            </div>
 
             <div className="space-y-4">
-              {uniqueProfessionals.map(prof => (
+              {recentProfessionals.map(prof => (
                 <Card
                   key={prof.id}
                   hover
@@ -166,14 +209,20 @@ export const ClientDashboardPage = () => {
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-gray-800">{prof.name}</h3>
-                        {lastAppointment && lastAppointment.professionalId === prof.id && (
-                          <p className="mt-1 text-sm text-gray-500">
-                            ⭐ Último turno: {format(parseISO(lastAppointment.date), 'dd/MM/yyyy', { locale: es })}
-                          </p>
-                        )}
-                        <p className="mt-1 text-sm font-medium text-primary">
-                          📅 {appointments.filter(a => a.professionalId === prof.id && a.status === 'COMPLETED').length} turnos completados
+                        <p className="mt-1 text-sm text-gray-600">{prof.profession}</p>
+                        <p className="mt-1 text-sm text-gray-500">
+                          ⭐ Último turno: {format(prof.lastAppointmentDate, 'dd/MM/yyyy', { locale: es })}
                         </p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <p className="text-sm font-medium text-primary">
+                            📅 {prof.totalAppointments} turno{prof.totalAppointments !== 1 ? 's' : ''} total{prof.totalAppointments !== 1 ? 'es' : ''}
+                          </p>
+                          {prof.completedAppointments > 0 && (
+                            <p className="text-sm text-gray-600">
+                              ✓ {prof.completedAppointments} completado{prof.completedAppointments !== 1 ? 's' : ''}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-primary">
@@ -201,7 +250,7 @@ export const ClientDashboardPage = () => {
                 <p>No tienes turnos programados</p>
                 <Button
                   className="mt-4"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate('/find-professionals')}
                 >
                   Agendar nuevo turno
                 </Button>

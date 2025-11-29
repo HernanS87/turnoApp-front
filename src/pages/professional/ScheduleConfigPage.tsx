@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
-import { useAuth } from '../../hooks/useAuth';
 import { Calendar, Clock, Plus, Trash2, Power, Edit } from 'lucide-react';
 import { toast } from 'react-toastify';
 import scheduleService from '../../services/scheduleService';
@@ -20,7 +19,6 @@ const DAYS_OF_WEEK = [
 ];
 
 export const ScheduleConfigPage = () => {
-  const { user } = useAuth();
   const [scheduleSlots, setScheduleSlots] = useState<ScheduleResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -145,9 +143,6 @@ export const ScheduleConfigPage = () => {
     }
   };
 
-  const getDayLabel = (dayValue: number) => {
-    return DAYS_OF_WEEK.find(d => d.value === dayValue)?.label || '';
-  };
 
   if (loading) {
     return (

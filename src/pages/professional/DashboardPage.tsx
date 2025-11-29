@@ -1,6 +1,5 @@
 import { Card } from '../../components/common/Card';
 import appointmentService from '../../services/appointmentService';
-import { useAuth } from '../../hooks/useAuth';
 import { Calendar, Clock, CheckCircle, TrendingUp } from 'lucide-react';
 import { isToday, parseISO, isThisWeek } from 'date-fns';
 import { useEffect, useState } from 'react';
@@ -8,7 +7,6 @@ import { AppointmentResponse } from '../../types/api';
 import { toast } from 'react-toastify';
 
 export const DashboardPage = () => {
-  const { user } = useAuth();
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +32,6 @@ export const DashboardPage = () => {
   const todayAppointments = appointments.filter(apt => isToday(parseISO(apt.date)));
   const weekAppointments = appointments.filter(apt => isThisWeek(parseISO(apt.date), { weekStartsOn: 1 }));
   const confirmedAppointments = appointments.filter(apt => apt.status === 'CONFIRMED');
-  const cancelledAppointments = appointments.filter(apt => apt.status === 'CANCELLED');
   const completedAppointments = appointments.filter(apt => apt.status === 'COMPLETED');
 
   // Today's appointments sorted by time (already includes client and service info from backend)

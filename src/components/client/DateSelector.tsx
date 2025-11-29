@@ -1,5 +1,4 @@
 import { format, startOfDay, addDays, isSameDay, isToday } from 'date-fns';
-import { es } from 'date-fns/locale';
 import type { DateAvailability } from '../../types/api';
 
 interface DateSelectorProps {
@@ -47,7 +46,7 @@ export const DateSelector = ({ availability, selectedDate, onSelectDate }: DateS
   }
 
   // Add all calendar days
-  calendarDays.forEach((day, index) => {
+  calendarDays.forEach((day) => {
     currentWeek.push(day);
 
     if (currentWeek.length === 7) {

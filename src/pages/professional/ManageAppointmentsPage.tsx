@@ -4,7 +4,6 @@ import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import appointmentService from '../../services/appointmentService';
 import { getErrorMessage } from '../../utils/errorHandler';
-import { useAuth } from '../../hooks/useAuth';
 import { Calendar, Clock, User, Mail, FileText, Filter, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -15,10 +14,8 @@ type StatusFilter = 'ALL' | AppointmentStatus | 'NO_SHOW';
 type DateFilter = 'ALL' | 'PAST' | 'FUTURE' | 'TODAY';
 
 export const ManageAppointmentsPage = () => {
-  const { user } = useAuth();
 
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentResponse | null>(null);
@@ -27,15 +24,12 @@ export const ManageAppointmentsPage = () => {
   // Load appointments from API on mount
   useEffect(() => {
     const loadAppointments = async () => {
-      setLoading(true);
       try {
         const data = await appointmentService.getAppointments();
         setAppointments(data);
       } catch (error) {
         toast.error(getErrorMessage(error, 'Error al cargar turnos'));
         setAppointments([]);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -149,10 +143,10 @@ export const ManageAppointmentsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container px-4 py-8 mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Gestión de Turnos</h1>
+          <h1 className="mb-2 text-3xl font-bold text-gray-800">Gestión de Turnos</h1>
           <p className="text-gray-600">Administrá y confirmá los turnos solicitados</p>
         </div>
 
@@ -163,10 +157,10 @@ export const ManageAppointmentsPage = () => {
             <h2 className="text-lg font-semibold text-gray-800">Filtros</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Status Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block mb-2 text-sm font-medium text-gray-700">
                 Estado
               </label>
               <select
@@ -184,7 +178,7 @@ export const ManageAppointmentsPage = () => {
 
             {/* Date Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block mb-2 text-sm font-medium text-gray-700">
                 Fecha
               </label>
               <select
@@ -201,7 +195,7 @@ export const ManageAppointmentsPage = () => {
           </div>
 
           {/* Results Count */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="pt-4 mt-4 border-t border-gray-200">
             <p className="text-sm text-gray-600">
               Mostrando <span className="font-semibold">{filteredAppointments.length}</span> turnos
             </p>
@@ -211,27 +205,27 @@ export const ManageAppointmentsPage = () => {
         {/* Appointments List */}
         {filteredAppointments.length === 0 ? (
           <Card>
-            <div className="text-center py-12 text-gray-500">
+            <div className="py-12 text-center text-gray-500">
               <Calendar size={48} className="mx-auto mb-4 opacity-50" />
               <p className="text-lg font-medium">No se encontraron turnos</p>
-              <p className="text-sm mt-2">Intentá ajustar los filtros</p>
+              <p className="mt-2 text-sm">Intentá ajustar los filtros</p>
             </div>
           </Card>
         ) : (
           <div className="space-y-4">
             {filteredAppointments.map((apt) => (
-              <Card key={apt.id} className="hover:shadow-lg transition-shadow">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <Card key={apt.id} className="transition-shadow hover:shadow-lg">
+                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                   {/* Main Info */}
                   <div className="flex-grow space-y-3">
                     {/* Date and Time */}
                     <div className="flex items-start gap-3">
-                      <Calendar className="text-primary mt-1 flex-shrink-0" size={20} />
+                      <Calendar className="flex-shrink-0 mt-1 text-primary" size={20} />
                       <div>
                         <p className="font-semibold text-gray-800">
                           {format(parseISO(apt.date), "EEEE d 'de' MMMM, yyyy", { locale: es })}
                         </p>
-                        <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                        <p className="flex items-center gap-1 mt-1 text-sm text-gray-600">
                           <Clock size={14} />
                           {apt.startTime} - {apt.endTime} ({apt.serviceDuration} min)
                         </p>
@@ -240,7 +234,7 @@ export const ManageAppointmentsPage = () => {
 
                     {/* Client */}
                     <div className="flex items-start gap-3">
-                      <User className="text-primary mt-1 flex-shrink-0" size={20} />
+                      <User className="flex-shrink-0 mt-1 text-primary" size={20} />
                       <div>
                         <p className="font-medium text-gray-800">
                           {apt.clientName}
@@ -251,7 +245,7 @@ export const ManageAppointmentsPage = () => {
 
                     {/* Service */}
                     <div className="flex items-start gap-3">
-                      <FileText className="text-primary mt-1 flex-shrink-0" size={20} />
+                      <FileText className="flex-shrink-0 mt-1 text-primary" size={20} />
                       <div>
                         <p className="font-medium text-gray-800">{apt.serviceName}</p>
                       </div>
@@ -259,7 +253,7 @@ export const ManageAppointmentsPage = () => {
 
                     {/* Notes */}
                     {apt.notes && (
-                      <div className="ml-8 bg-gray-50 p-3 rounded-lg">
+                      <div className="p-3 ml-8 rounded-lg bg-gray-50">
                         <p className="text-sm text-gray-700">
                           <span className="font-medium">Notas:</span> {apt.notes}
                         </p>
@@ -272,7 +266,7 @@ export const ManageAppointmentsPage = () => {
                     {/* Status Badge */}
                     <div className={`px-4 py-2 rounded-lg border flex items-center justify-center gap-2 ${getStatusColor(apt.status)}`}>
                       {getStatusIcon(apt.status)}
-                      <span className="font-medium text-sm">{getStatusLabel(apt.status)}</span>
+                      <span className="text-sm font-medium">{getStatusLabel(apt.status)}</span>
                     </div>
 
                     {/* Action Buttons */}
@@ -330,8 +324,8 @@ export const ManageAppointmentsPage = () => {
           <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Detalles del Turno">
             <div className="space-y-4">
               {/* Appointment Info */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-gray-800 mb-3">Información del Turno</h3>
+              <div className="p-4 rounded-lg bg-gray-50">
+                <h3 className="mb-3 font-semibold text-gray-800">Información del Turno</h3>
                 <div className="space-y-2 text-sm">
                   <p>
                     <span className="font-medium">Fecha:</span>{' '}
@@ -356,8 +350,8 @@ export const ManageAppointmentsPage = () => {
               </div>
 
               {/* Client Info */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-gray-800 mb-3">Datos del Cliente</h3>
+              <div className="p-4 rounded-lg bg-gray-50">
+                <h3 className="mb-3 font-semibold text-gray-800">Datos del Cliente</h3>
                 <div className="space-y-2 text-sm">
                   <p className="flex items-center gap-2">
                     <User size={16} className="text-primary" />
@@ -372,14 +366,14 @@ export const ManageAppointmentsPage = () => {
 
               {/* Notes */}
               {selectedAppointment.notes && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-800 mb-2">Notas</h3>
+                <div className="p-4 rounded-lg bg-gray-50">
+                  <h3 className="mb-2 font-semibold text-gray-800">Notas</h3>
                   <p className="text-sm text-gray-700">{selectedAppointment.notes}</p>
                 </div>
               )}
 
               {/* Metadata */}
-              <div className="text-xs text-gray-500 pt-2 border-t border-gray-200">
+              <div className="pt-2 text-xs text-gray-500 border-t border-gray-200">
                 <p>Turno creado: {format(new Date(selectedAppointment.createdAt), "d/MM/yyyy 'a las' HH:mm", { locale: es })}</p>
               </div>
             </div>

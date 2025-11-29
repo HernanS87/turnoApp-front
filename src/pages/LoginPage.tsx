@@ -13,7 +13,7 @@ export const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, register, user } = useAuth();
+  const { login, register } = useAuth();
   const navigate = useNavigate();
 
   // Register form state

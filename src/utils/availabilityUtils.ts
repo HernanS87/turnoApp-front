@@ -1,4 +1,4 @@
-import { addDays, format, parseISO, setHours, setMinutes, isAfter, isBefore, startOfDay } from 'date-fns';
+import { addDays, format, setHours, setMinutes, isAfter, isBefore, startOfDay } from 'date-fns';
 import { SCHEDULE } from '../data/schedule';
 import { APPOINTMENTS } from '../data/appointments';
 import { Service } from '../types';

@@ -1,5 +1,5 @@
 import api from './api';
-import { Professional, SiteConfig } from '../types';
+import { Professional } from '../types';
 
 export interface SiteConfigRequest {
   logoUrl?: string;

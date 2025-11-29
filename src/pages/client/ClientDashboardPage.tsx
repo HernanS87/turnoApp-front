@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import appointmentService from '../../services/appointmentService';
@@ -12,7 +11,6 @@ import { es } from 'date-fns/locale';
 import { toast } from 'react-toastify';
 
 export const ClientDashboardPage = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
@@ -62,9 +60,6 @@ export const ClientDashboardPage = () => {
     .filter(apt => isPast(parseISO(apt.date)) || apt.status === 'COMPLETED' || apt.status === 'CANCELLED')
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
-
-  // Calculate stats
-  const completedCount = appointments.filter(apt => apt.status === 'COMPLETED').length;
 
   // Get unique professionals with aggregated information
   interface ProfessionalInfo {
